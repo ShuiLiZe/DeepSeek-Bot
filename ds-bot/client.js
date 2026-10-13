@@ -2748,6 +2748,53 @@ div:has(> nav [class*="_marks"]){display:none!important}
 .bt-earlier .bt-event{margin:4px 0}
 .bt-part-line{display:flex;align-items:center;gap:10px;margin:10px 0 6px;font-size:11px;line-height:14px;color:var(--bt-ink-3)}
 .bt-part-line::before,.bt-part-line::after{content:"";flex:1;height:1px;background:var(--bt-line)}
+
+/* Mobile Responsive Adaptations */
+@media (max-width: 768px), (pointer: coarse) {
+  .bt-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw !important;
+    max-width: 100vw;
+    z-index: 100;
+    border-left: 0;
+    box-shadow: none;
+  }
+  .bt-panel-grip {
+    display: none !important;
+  }
+  .bt-bubble {
+    max-width: 92% !important;
+  }
+  .bt-ububble {
+    max-width: 90% !important;
+  }
+  .bt-account-menu {
+    left: 12px !important;
+    right: 12px !important;
+    max-width: calc(100vw - 24px) !important;
+    bottom: 60px !important;
+  }
+  .bt-menu button {
+    min-height: 44px;
+    font-size: 15px;
+    padding: 10px 14px;
+  }
+  .bt-return {
+    min-height: 42px;
+    padding: 0 16px;
+  }
+  .bt-head {
+    height: 52px;
+    padding: 0 12px;
+  }
+  .bt-drawer-head {
+    height: 52px;
+  }
+}
 `;
 function installStyles(text, tag) {
   const style = document.createElement("style");
@@ -2977,6 +3024,25 @@ function RoomAvatar({ room: room2, roster, size = 36 }) {
       return (0, import_react2.createElement)("span", { key: bot?.id ?? "you", style }, seat(bot, s));
     })
   );
+}
+
+// src/client/responsive.js
+function isMobileEnvironment() {
+  if (typeof window === "undefined") return false;
+  if (window.__DSH_MOBILE_FRONTEND__ === "dedicated") return true;
+  if (document.documentElement.classList.contains("dsh-native-mobile-active")) return true;
+  if (window.matchMedia?.("(max-width: 768px)").matches) return true;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+function useIsMobile() {
+  if (typeof window === "undefined") return false;
+  const [mobile, setMobile] = useState(() => isMobileEnvironment());
+  useEffect(() => {
+    const check = () => setMobile(isMobileEnvironment());
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return mobile;
 }
 
 // src/client/icons.js
@@ -5247,7 +5313,13 @@ function AccountLauncher({ seat = true, settingsOpen, openSettings, openOnboardi
   }, [open]);
   const toggle = () => {
     const rect = button.current?.getBoundingClientRect();
-    if (rect) setBox({ left: rect.left, bottom: window.innerHeight - rect.top + 5 });
+    if (rect) {
+      if (isMobileEnvironment()) {
+        setBox({ left: 16, right: 16, bottom: window.innerHeight - rect.top + 8, width: "auto" });
+      } else {
+        setBox({ left: rect.left, bottom: window.innerHeight - rect.top + 5 });
+      }
+    }
     setOpen((value) => !value);
   };
   const groups = [
@@ -5320,12 +5392,22 @@ function FooterAccount(props) {
 }
 function BotReturn({ wide, useSurface, actions }) {
   const mode = useSurface((value) => value.mode);
-  if (mode !== "agent") return null;
+  const isMobile = isMobileEnvironment();
+  if (mode !== "agent" && !isMobile) return null;
   return (0, import_react8.createElement)(
     "button",
-    { type: "button", className: "bt-return", "aria-label": t("DS Bot"), title: t("DS Bot"), onClick: () => actions.setSurface("bot") },
+    {
+      type: "button",
+      className: "bt-return",
+      "aria-label": t("DS Bot"),
+      title: t("DS Bot"),
+      onClick: () => {
+        actions.setSurface("bot");
+        if (actions.openMainBot) actions.openMainBot();
+      }
+    },
     (0, import_react8.createElement)(BotMark, { look: MAIN_LOOK, size: 20 }),
-    wide ? (0, import_react8.createElement)("span", { className: "bt-return-name" }, t("DS Bot")) : null
+    wide || isMobile ? (0, import_react8.createElement)("span", { className: "bt-return-name" }, t("DS Bot")) : null
   );
 }
 var RETURN_CSS = `

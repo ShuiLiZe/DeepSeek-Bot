@@ -1,6 +1,7 @@
 import { createElement as h, Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
+import { isMobileEnvironment } from './responsive.js'
 import { isMainOf } from './sources.js'
 import { currentPart, previewOf, relativeShort } from './text.js'
 import { PlusIcon, SearchIcon, GaugeIcon, PlugIcon, ClockIcon, GearIcon, PinMarkIcon, ConnectorIcon, SwitchIcon, CloudDownloadIcon } from './icons.js'
@@ -505,7 +506,13 @@ export function AccountLauncher({ seat = true, settingsOpen, openSettings, openO
   }, [open])
   const toggle = () => {
     const rect = button.current?.getBoundingClientRect()
-    if (rect) setBox({ left: rect.left, bottom: window.innerHeight - rect.top + 5 })
+    if (rect) {
+      if (isMobileEnvironment()) {
+        setBox({ left: 16, right: 16, bottom: window.innerHeight - rect.top + 8, width: 'auto' })
+      } else {
+        setBox({ left: rect.left, bottom: window.innerHeight - rect.top + 5 })
+      }
+    }
     setOpen(value => !value)
   }
   const groups = [
@@ -571,10 +578,20 @@ export function FooterAccount(props) {
 // withdrawn, and this button in the shell's own footer is the way back.
 export function BotReturn({ wide, useSurface, actions }) {
   const mode = useSurface(value => value.mode)
-  if (mode !== 'agent') return null
-  return h('button', { type: 'button', className: 'bt-return', 'aria-label': t('DS Bot'), title: t('DS Bot'), onClick: () => actions.setSurface('bot') },
+  const isMobile = isMobileEnvironment()
+  if (mode !== 'agent' && !isMobile) return null
+  return h('button', {
+    type: 'button',
+    className: 'bt-return',
+    'aria-label': t('DS Bot'),
+    title: t('DS Bot'),
+    onClick: () => {
+      actions.setSurface('bot')
+      if (actions.openMainBot) actions.openMainBot()
+    }
+  },
     h(BotMark, { look: MAIN_LOOK, size: 20 }),
-    wide ? h('span', { className: 'bt-return-name' }, t('DS Bot')) : null)
+    (wide || isMobile) ? h('span', { className: 'bt-return-name' }, t('DS Bot')) : null)
 }
 
 // Agent mode has none of the shell-group styles, so the return button carries its own.

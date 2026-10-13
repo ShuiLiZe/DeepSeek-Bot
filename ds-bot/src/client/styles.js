@@ -959,6 +959,53 @@ div:has(> nav [class*="_marks"]){display:none!important}
 .bt-earlier .bt-event{margin:4px 0}
 .bt-part-line{display:flex;align-items:center;gap:10px;margin:10px 0 6px;font-size:11px;line-height:14px;color:var(--bt-ink-3)}
 .bt-part-line::before,.bt-part-line::after{content:"";flex:1;height:1px;background:var(--bt-line)}
+
+/* Mobile Responsive Adaptations */
+@media (max-width: 768px), (pointer: coarse) {
+  .bt-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw !important;
+    max-width: 100vw;
+    z-index: 100;
+    border-left: 0;
+    box-shadow: none;
+  }
+  .bt-panel-grip {
+    display: none !important;
+  }
+  .bt-bubble {
+    max-width: 92% !important;
+  }
+  .bt-ububble {
+    max-width: 90% !important;
+  }
+  .bt-account-menu {
+    left: 12px !important;
+    right: 12px !important;
+    max-width: calc(100vw - 24px) !important;
+    bottom: 60px !important;
+  }
+  .bt-menu button {
+    min-height: 44px;
+    font-size: 15px;
+    padding: 10px 14px;
+  }
+  .bt-return {
+    min-height: 42px;
+    padding: 0 16px;
+  }
+  .bt-head {
+    height: 52px;
+    padding: 0 12px;
+  }
+  .bt-drawer-head {
+    height: 52px;
+  }
+}
 `
 
 // -------------------------------------------------------------------------
