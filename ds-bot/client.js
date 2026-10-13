@@ -2383,7 +2383,7 @@ button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-side
 .bt-connect-foot .bt-connect-label{display:none!important}
 .bt-connect-foot svg{flex:none;width:16px;height:16px;margin:0}
 
-.bt-menu{position:fixed;pointer-events:auto;z-index:60;min-width:200px;padding:6px;border-radius:12px;background:var(--bt-main);border:.5px solid var(--bt-line-2);box-shadow:0 10px 20px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1),0 0 0 1px rgba(228,228,228,.04);display:flex;flex-direction:column;gap:2px;transform-origin:var(--bt-origin,top left);animation:bt-pop-drop ${SPRING_TAP.duration}ms ${SPRING_TAP.easing},bt-veil-in .14s ease-out;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;box-sizing:border-box}
+.bt-menu{position:fixed;pointer-events:auto;z-index:600;min-width:200px;padding:6px;border-radius:12px;background:var(--bt-main);border:.5px solid var(--bt-line-2);box-shadow:0 10px 20px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1),0 0 0 1px rgba(228,228,228,.04);display:flex;flex-direction:column;gap:2px;transform-origin:var(--bt-origin,top left);animation:bt-pop-drop ${SPRING_TAP.duration}ms ${SPRING_TAP.easing},bt-veil-in .14s ease-out;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;box-sizing:border-box}
 .bt-menu button{display:flex;align-items:center;gap:4px;width:100%;min-height:30px;text-align:left;border:0;background:none;border-radius:6px;padding:6px 8px;font:inherit;font-size:13px;line-height:18px;color:var(--bt-ink);cursor:pointer;box-sizing:border-box}
 .bt-menu button:hover{background:var(--bt-hover)}
 .bt-menu button svg{flex:none;width:16px;height:16px;margin:0 1px}
@@ -2946,11 +2946,6 @@ div:has(> nav [class*="_marks"]){display:none!important}
     max-width: min(280px, calc(100vw - 24px)) !important;
     box-shadow: 0 12px 32px rgba(0, 0, 0, .28) !important;
   }
-  .bt-menu button {
-    min-height: 44px;
-    font-size: 15px;
-    padding: 10px 14px;
-  }
   .bt-bubble {
     max-width: 92% !important;
   }
@@ -3054,6 +3049,39 @@ div:has(> nav [class*="_marks"]){display:none!important}
     align-items: center !important;
     gap: 8px !important;
     margin: 0 !important;
+  }
+
+  /* 8. 工作文件夹菜单：手机端全宽底部弹层，任何设置面板都压不住它 */
+  .bt-menu {
+    z-index: 900 !important;
+    max-height: min(62dvh, 520px) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    border-radius: 14px !important;
+    box-shadow: 0 16px 44px rgba(0, 0, 0, .34) !important;
+  }
+  .bt-menu button {
+    min-height: 44px !important;
+    font-size: 15px !important;
+    padding: 10px 12px !important;
+  }
+  .bt-folder-menu {
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+  .bt-folder-path,
+  .bt-folder-here {
+    font-size: 12px !important;
+    line-height: 16px !important;
+  }
+  .bt-folder-input {
+    height: 40px !important;
+    font-size: 15px !important;
+  }
+  .bt-model-trigger {
+    min-height: 40px !important;
   }
 }
 `;
@@ -6793,10 +6821,12 @@ function useAnchoredMenu() {
       if (!menu.current?.contains(event.target)) close();
     };
     window.addEventListener("mousedown", onDown);
+    window.addEventListener("touchstart", onDown);
     window.addEventListener("keydown", onKey, true);
     window.addEventListener("scroll", onScroll, true);
     return () => {
       window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("touchstart", onDown);
       window.removeEventListener("keydown", onKey, true);
       window.removeEventListener("scroll", onScroll, true);
     };
