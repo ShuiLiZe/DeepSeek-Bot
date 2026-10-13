@@ -399,7 +399,7 @@ export function ConnectPlugins({ wide, actions }) {
       onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide,
       onClick: () => actions.selectPanel('plugins'),
     },
-    h(PlugIcon), t('Connect plugins'), h('span', { className: 'bt-connect-warn', 'aria-hidden': true }, '!')),
+    h(PlugIcon), t('Connect plugins')),
     tip && box ? createPortal(h('span', { role: 'tooltip', id: tipId, className: 'bt-connect-tip', style: box },
       t('Plugin compatibility is not fully verified.')), document.body) : null)
 }
@@ -500,12 +500,21 @@ export function AccountLauncher({ seat = true, settingsOpen, openSettings, openO
     }
     const onKey = (event) => { if (event.key === 'Escape') { event.stopPropagation(); setOpen(false); button.current?.focus() } }
     window.addEventListener('mousedown', onDown)
+    window.addEventListener('touchstart', onDown, { passive: true })
     window.addEventListener('keydown', onKey, true)
-    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey, true) }
+    return () => {
+      window.removeEventListener('mousedown', onDown)
+      window.removeEventListener('touchstart', onDown)
+      window.removeEventListener('keydown', onKey, true)
+    }
   }, [open])
-  const toggle = () => {
+  const toggle = (event) => {
+    event?.stopPropagation?.()
     const rect = button.current?.getBoundingClientRect()
-    if (rect) setBox({ left: rect.left, bottom: window.innerHeight - rect.top + 5 })
+    if (rect) {
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - 268))
+      setBox({ left, bottom: window.innerHeight - rect.top + 5 })
+    }
     setOpen(value => !value)
   }
   const groups = [
@@ -610,7 +619,8 @@ export const SIDEBAR_CSS = `
 [class*="_footArea"]:has(.bt-foot-account){display:flex!important;flex-direction:row!important;align-items:center;gap:6px}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_footerActions"],[class*="_footArea"]:has(.bt-foot-account)>[class*="_footerActions"]>div{display:contents!important}
 .bt-foot-account{order:-1;flex:none;display:inline-flex}
-[class*="_footArea"]:has(.bt-foot-account) .bt-connect-foot{order:0;flex:1 1 auto;min-width:0;width:auto}
+[class*="_footArea"]:has(.bt-foot-account) .bt-connect-foot{order:0;flex:1 1 auto;min-width:0;width:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bt-connect-warn{display:none!important}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{order:1;flex:none}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
 

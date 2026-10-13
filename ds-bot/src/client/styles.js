@@ -966,6 +966,75 @@ div:has(> nav [class*="_marks"]){display:none!important}
 .bt-earlier .bt-event{margin:4px 0}
 .bt-part-line{display:flex;align-items:center;gap:10px;margin:10px 0 6px;font-size:11px;line-height:14px;color:var(--bt-ink-3)}
 .bt-part-line::before,.bt-part-line::after{content:"";flex:1;height:1px;background:var(--bt-line)}
+
+/* Mobile Responsive Adaptations & Drawers Overhaul */
+.bt-connect-warn{display:none!important}
+.bt-account-menu{z-index:500!important}
+
+@media (max-width: 768px), (pointer: coarse) {
+  .bt-panel-backdrop {
+    display: block !important;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 245 !important;
+    background: rgba(15, 23, 42, .38) !important;
+    backdrop-filter: blur(2px) !important;
+    -webkit-backdrop-filter: blur(2px) !important;
+    animation: bt-fade-in .15s ease-out !important;
+  }
+  .bt-panel,
+  [data-dsh-mobile-details],
+  aside.bt-panel {
+    z-index: 250 !important;
+    width: min(84vw, 360px) !important;
+    max-width: 86vw !important;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, .25) !important;
+  }
+  .bt-panel-grip {
+    display: none !important;
+  }
+  .bt-connect-foot {
+    padding: 0 8px !important;
+    max-width: 108px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 12px !important;
+  }
+  [class*="_footArea"]:has(.bt-foot-account) {
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+  }
+  .bt-account-menu {
+    z-index: 500 !important;
+    left: 12px !important;
+    bottom: 60px !important;
+    max-width: min(280px, calc(100vw - 24px)) !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .28) !important;
+  }
+  .bt-menu button {
+    min-height: 44px;
+    font-size: 15px;
+    padding: 10px 14px;
+  }
+  .bt-bubble {
+    max-width: 92% !important;
+  }
+  .bt-ububble {
+    max-width: 90% !important;
+  }
+  .bt-return {
+    min-height: 42px;
+    padding: 0 16px;
+  }
+  .bt-head {
+    height: 52px;
+    padding: 0 12px;
+  }
+  .bt-drawer-head {
+    height: 52px;
+  }
+}
 `
 
 // -------------------------------------------------------------------------
