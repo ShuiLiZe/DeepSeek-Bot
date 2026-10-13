@@ -634,7 +634,9 @@ export const SIDEBAR_CSS = `
 [class*="_footArea"]:has(.bt-foot-account){display:flex!important;flex-direction:row!important;align-items:center;gap:6px}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_footerActions"],[class*="_footArea"]:has(.bt-foot-account)>[class*="_footerActions"]>div{display:contents!important}
 .bt-foot-account{order:-1;flex:none;display:inline-flex}
-[class*="_footArea"]:has(.bt-foot-account) .bt-connect-foot{order:0;flex:1 1 auto;min-width:0;width:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+[class*="_footArea"]:has(.bt-foot-account) .bt-connect-wrap{order:0;flex:none}
+[class*="_footArea"]:has(.bt-foot-account) .bt-connect-foot{order:0;flex:0 0 36px;width:36px;height:36px;min-width:36px;max-width:36px;padding:0;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;gap:0}
+[class*="_footArea"]:has(.bt-foot-account) .bt-connect-foot .bt-connect-label{display:none!important}
 .bt-connect-warn{display:none!important}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{order:1;flex:none}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
