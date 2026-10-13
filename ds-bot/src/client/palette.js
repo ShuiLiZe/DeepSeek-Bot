@@ -100,7 +100,12 @@ export function CommandPalette({ start, token, roster, actions, useSessions }) {
   }
   let index = -1
   return h('div', { className: 'bt-palette-layer', 'data-leaving': leaving || undefined },
-    h('div', { className: 'bt-backdrop', onMouseDown: close }),
+    h('div', {
+      className: 'bt-backdrop',
+      onMouseDown: close,
+      onClick: close,
+      onTouchStart: (e) => { e.stopPropagation(); close() },
+    }),
     h('div', { className: 'bt-palette', role: 'dialog', 'aria-label': t('Search'), 'aria-modal': true },
       h('div', { className: 'bt-palette-head' },
         h('span', { className: 'bt-palette-glyph', 'aria-hidden': true }, h(SearchIcon)),
@@ -115,7 +120,8 @@ export function CommandPalette({ start, token, roster, actions, useSessions }) {
             else if (event.key === 'Enter') { event.preventDefault(); choose(rows[active]) }
           },
         }),
-        query ? h('button', { type: 'button', className: 'bt-palette-clear', 'aria-label': t('Clear search'), onClick: () => { setQuery(''); setCursor(0) } }, h(CloseIcon)) : null),
+        query ? h('button', { type: 'button', className: 'bt-palette-clear', 'aria-label': t('Clear search'), onClick: () => { setQuery(''); setCursor(0) } }, h(CloseIcon)) : null,
+        h('button', { type: 'button', className: 'bt-palette-close', 'aria-label': t('Cancel'), onClick: close }, t('Cancel'))),
       h('div', { ref: listRef, id: 'bt-palette-list', className: 'bt-palette-list', role: 'listbox', 'aria-label': t('Results') },
         h('span', { ref: glide.thumb, className: 'bt-thumb', 'aria-hidden': true }),
         rows.length === 0

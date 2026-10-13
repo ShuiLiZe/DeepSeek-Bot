@@ -267,15 +267,29 @@ export function TeamSidebar(props) {
     event.preventDefault()
     actions.openPalette(event.key)
   }
+  const dismissMobileDrawer = () => {
+    const toggle = document.querySelector('[data-dsh-mobile-toggle]') || document.querySelector('button[class*="_toggle"]')
+    const drawer = document.querySelector('.dshm-drawer[data-open=true]') || document.querySelector('[data-pane="sidebar"][data-open=true]')
+    if (drawer && toggle) toggle.click()
+  }
+  const onSearchClick = () => {
+    dismissMobileDrawer()
+    actions.openPalette()
+  }
+  const onNewChatClick = () => {
+    dismissMobileDrawer()
+    actions.openNewChat('new')
+  }
+
   return h('div', { className: wide ? 'bt-side' : 'bt-side bt-rail', onKeyDown: typeToSearch },
     wide ? h('div', { className: 'bt-side-top' },
       h('span', { className: 'bt-brand' }, h(BrandMark, { size: 22 }), h(BrandName)),
       h(UpdateButton, { useUpdate: props.useUpdate, actions }),
-      h('button', { type: 'button', className: 'bt-round', 'aria-label': t('Search'), title: t('Search'), onClick: () => actions.openPalette() }, h(SearchIcon)),
-      h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: () => actions.openNewChat('new') }, h(PlusIcon)))
+      h('button', { type: 'button', className: 'bt-round', 'aria-label': t('Search'), title: t('Search'), onClick: onSearchClick }, h(SearchIcon)),
+      h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: onNewChatClick }, h(PlusIcon)))
       : h(Fragment, null,
           h(UpdateButton, { useUpdate: props.useUpdate, actions }),
-          h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: () => actions.openNewChat('new') }, h(PlusIcon))),
+          h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: onNewChatClick }, h(PlusIcon))),
     wide && roster.readOnly ? h('div', { className: 'bt-hint bt-read-only', role: 'status' }, hostText(roster.readOnly)) : null,
     h('div', { ref: listRef, className: 'bt-list', role: 'region', 'aria-label': t('Bot list') },
       main ? h(BotRow, { ...rowProps, bot: main, marked: markedUnread[main.id] === true }) : roster.ready ? null : h('div', { className: 'bt-hint' }, t('Setting up your Main Bot…')),
@@ -396,10 +410,11 @@ export function ConnectPlugins({ wide, actions }) {
   return h('span', { className: 'bt-connect-wrap' },
     h('button', {
       ref: button, type: 'button', className: 'bt-connect bt-connect-foot', 'aria-describedby': tip ? tipId : undefined,
+      'aria-label': t('Connect plugins'), title: t('Connect plugins'),
       onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide,
       onClick: () => actions.selectPanel('plugins'),
     },
-    h(PlugIcon), t('Connect plugins')),
+    h(PlugIcon), h('span', { className: 'bt-connect-label' }, t('Connect plugins'))),
     tip && box ? createPortal(h('span', { role: 'tooltip', id: tipId, className: 'bt-connect-tip', style: box },
       t('Plugin compatibility is not fully verified.')), document.body) : null)
 }

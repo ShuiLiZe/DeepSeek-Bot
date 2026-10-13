@@ -111,8 +111,25 @@ export function NewChat({ mode, roster, actions }) {
   useFlip(glide.box, listed, '[data-flip]')
   const drop = useRef(null)
   useMorph(drop, listed)
+
+  const touchStartRef = useRef(null)
+  const onTouchStart = (e) => {
+    if (e.touches && e.touches.length === 1) {
+      touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    }
+  }
+  const onTouchEnd = (e) => {
+    if (!touchStartRef.current || !e.changedTouches || e.changedTouches.length === 0) return
+    const dx = e.changedTouches[0].clientX - touchStartRef.current.x
+    const dy = e.changedTouches[0].clientY - touchStartRef.current.y
+    touchStartRef.current = null
+    if (dx > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+      close()
+    }
+  }
+
   if (draft) {
-    return h('div', { className: 'bt-pane', style: { left: paneLeft } },
+    return h('div', { className: 'bt-pane bt-pane-newchat', style: { left: paneLeft } },
       h(CreateBot, {
         roster, actions, start: draft, brief: message.trim(), canGoBack: draft.fromList,
         onBack: draft.fromList ? () => { setDraft(null); setTimeout(() => inputRef.current?.focus()) } : close,
@@ -126,7 +143,7 @@ export function NewChat({ mode, roster, actions }) {
     if (picked.length > 0) setPicked(current => current.slice(0, -1))
     else if (admin !== null) setAdmin(null)
   }
-  return h('div', { className: 'bt-pane', style: { left: paneLeft } },
+  return h('div', { className: 'bt-pane bt-pane-newchat', style: { left: paneLeft }, onTouchStart, onTouchEnd },
     h('div', { className: 'bt-newchat', role: 'dialog', 'aria-label': mode === 'search' ? t('Search') : t('New chat') },
       h('div', { className: 'bt-to' },
         h('span', { className: 'bt-to-label' }, t('To:')),

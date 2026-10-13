@@ -586,6 +586,7 @@ button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-side
 .bt-palette-clear{width:18px;height:18px;border:0;padding:0;border-radius:6px;background:none;color:var(--bt-ink-3);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
 .bt-palette-clear:hover{color:var(--bt-ink)}
 .bt-palette-clear svg{width:12px;height:12px}
+.bt-palette-close{display:none}
 .bt-palette-list{position:relative;height:402px;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:2px;box-sizing:border-box}
 .bt-palette-list>.bt-thumb,.bt-drop-list>.bt-thumb{left:0;right:0;border-radius:8px;background:var(--bt-active)}
 .bt-palette-list>.bt-thumb{left:8px;right:8px}
@@ -972,6 +973,15 @@ div:has(> nav [class*="_marks"]){display:none!important}
 .bt-account-menu{z-index:500!important}
 
 @media (max-width: 768px), (pointer: coarse) {
+  /* 1. 左侧边栏抽屉紧凑收拢，避免空旷笨重 */
+  .dshm-drawer[data-open=true],
+  [data-pane="sidebar"][data-open=true],
+  .bt-side {
+    width: min(72vw, 276px) !important;
+    max-width: 280px !important;
+  }
+
+  /* 2. 右侧会话详情抽屉适度收拢与背景半透明遮罩 */
   .bt-panel-backdrop {
     display: block !important;
     position: fixed !important;
@@ -986,25 +996,129 @@ div:has(> nav [class*="_marks"]){display:none!important}
   [data-dsh-mobile-details],
   aside.bt-panel {
     z-index: 250 !important;
-    width: min(84vw, 360px) !important;
-    max-width: 86vw !important;
+    width: min(74vw, 290px) !important;
+    max-width: 295px !important;
     box-shadow: -4px 0 24px rgba(0, 0, 0, .25) !important;
   }
   .bt-panel-grip {
     display: none !important;
   }
-  .bt-connect-foot {
-    padding: 0 8px !important;
-    max-width: 108px !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    font-size: 12px !important;
+
+  /* 3. 左侧边栏底部连接插件与工具按钮图标化排布 */
+  .bt-connect-wrap {
+    flex: none !important;
   }
-  [class*="_footArea"]:has(.bt-foot-account) {
+  .bt-connect-foot {
+    width: 36px !important;
+    min-width: 36px !important;
+    max-width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    font-size: 0 !important;
+    flex: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  .bt-connect-foot svg {
+    width: 17px !important;
+    height: 17px !important;
+    margin: 0 !important;
+  }
+  .bt-connect-label {
+    display: none !important;
+  }
+  [class*="_footArea"] {
+    display: flex !important;
+    align-items: center !important;
     flex-wrap: nowrap !important;
+    gap: 8px !important;
+  }
+
+  /* 4. 新建聊天 / 创建 Bot 全局置顶与移动端视口铺满 */
+  .bt-pane {
+    left: 0 !important;
+    right: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    z-index: 600 !important;
+    background: var(--bt-main) !important;
+  }
+  .bt-newchat {
+    padding: 12px 14px !important;
+  }
+  .bt-to {
+    padding: 8px 12px !important;
     gap: 6px !important;
   }
+  .bt-to input {
+    font-size: 15px !important;
+  }
+  .bt-drop {
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: 52vh !important;
+  }
+  .bt-x {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 20px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  .bt-nc-card {
+    max-width: 100% !important;
+  }
+
+  /* 5. 搜索 Command Palette 全局置顶与移动端弹层重塑 */
+  .bt-palette-layer {
+    z-index: 600 !important;
+  }
+  .bt-palette {
+    top: 14px !important;
+    left: 12px !important;
+    right: 12px !important;
+    bottom: auto !important;
+    width: auto !important;
+    max-width: calc(100vw - 24px) !important;
+    transform: none !important;
+    border-radius: 16px !important;
+    max-height: calc(100dvh - 28px) !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .3) !important;
+  }
+  .bt-palette-head {
+    height: 48px !important;
+    padding: 0 12px !important;
+    gap: 8px !important;
+  }
+  .bt-palette-head input {
+    font-size: 15px !important;
+  }
+  .bt-palette-list {
+    height: auto !important;
+    max-height: min(380px, calc(72dvh - 56px)) !important;
+  }
+  .bt-palette-close {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 4px 8px !important;
+    border: 0 !important;
+    background: none !important;
+    color: var(--bt-accent, #0066cc) !important;
+    font: inherit !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+  }
+
+  /* 6. 小鲸鱼头像菜单置顶与触控优化 */
   .bt-account-menu {
     z-index: 500 !important;
     left: 12px !important;
