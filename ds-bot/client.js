@@ -5567,6 +5567,26 @@ function HeaderPill({ sessionId, useRoster, useSessions, useSessionStatus, useSe
       delete document.body.dataset.btRoom;
     };
   }, [Boolean(room2)]);
+  const touchStart = (0, import_react9.useRef)({ x: 0, y: 0, time: 0 });
+  const onTouchStart = (e) => {
+    const t2 = e.touches[0];
+    if (t2) touchStart.current = { x: t2.clientX, y: t2.clientY, time: Date.now() };
+  };
+  const onTouchEnd = (e) => {
+    const t2 = e.changedTouches[0];
+    if (!t2) return;
+    const dx = t2.clientX - touchStart.current.x;
+    const dy = t2.clientY - touchStart.current.y;
+    const dt = Date.now() - touchStart.current.time;
+    if (dt < 600 && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx > 0) {
+        const toggle = document.querySelector("[data-dsh-mobile-toggle]") || document.querySelector('button[class*="_toggle"]');
+        toggle?.click();
+      } else {
+        if (!detailsOpen) actions.toggleDetails(sessionId);
+      }
+    }
+  };
   const memoryNotice = notice && changed !== null && roster.memory !== false;
   return (0, import_react9.createElement)(
     "div",
@@ -5579,6 +5599,8 @@ function HeaderPill({ sessionId, useRoster, useSessions, useSessionStatus, useSe
         "aria-expanded": detailsOpen,
         "data-memory": memoryNotice ? "updated" : void 0,
         "aria-label": memoryNotice ? t("Memory updated. Open {name}'s memory", { name: roster.byId[changed]?.name ?? name }) : t("View conversation details"),
+        onTouchStart,
+        onTouchEnd,
         onClick: () => memoryNotice ? actions.openMemory(changed) : actions.toggleDetails(sessionId)
       },
       bot ? (0, import_react9.createElement)(BotAvatar, { bot, size: 24, state: botState(running, doing, roster.questions?.[currentPart(bot)] !== void 0), badge: false }) : room2 ? (0, import_react9.createElement)(RoomAvatar, { room: room2, roster, size: 24 }) : null,

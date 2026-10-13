@@ -88,11 +88,35 @@ export function HeaderPill({ sessionId, useRoster, useSessions, useSessionStatus
     else delete document.body.dataset.btRoom
     return () => { delete document.body.dataset.btRoom }
   }, [Boolean(room)])
+  const touchStart = useRef({ x: 0, y: 0, time: 0 })
+  const onTouchStart = (e) => {
+    const t = e.touches[0]
+    if (t) touchStart.current = { x: t.clientX, y: t.clientY, time: Date.now() }
+  }
+  const onTouchEnd = (e) => {
+    const t = e.changedTouches[0]
+    if (!t) return
+    const dx = t.clientX - touchStart.current.x
+    const dy = t.clientY - touchStart.current.y
+    const dt = Date.now() - touchStart.current.time
+    if (dt < 600 && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx > 0) {
+        // 右滑：拉出左侧侧边栏/抽屉
+        const toggle = document.querySelector('[data-dsh-mobile-toggle]') || document.querySelector('button[class*="_toggle"]')
+        toggle?.click()
+      } else {
+        // 左滑：打开右侧会话详情
+        if (!detailsOpen) actions.toggleDetails(sessionId)
+      }
+    }
+  }
   const memoryNotice = notice && changed !== null && roster.memory !== false
   return h('div', { className: 'bt-head' },
     h('button', {
       type: 'button', className: 'bt-pill', 'aria-expanded': detailsOpen, 'data-memory': memoryNotice ? 'updated' : undefined,
       'aria-label': memoryNotice ? t('Memory updated. Open {name}\'s memory', { name: roster.byId[changed]?.name ?? name }) : t('View conversation details'),
+      onTouchStart,
+      onTouchEnd,
       onClick: () => (memoryNotice ? actions.openMemory(changed) : actions.toggleDetails(sessionId)),
     },
     bot ? h(BotAvatar, { bot, size: 24, state: botState(running, doing, roster.questions?.[currentPart(bot)] !== undefined), badge: false })
