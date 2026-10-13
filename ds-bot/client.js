@@ -2650,14 +2650,14 @@ header[class*="_header"] .bt-head{flex:1 1 auto;width:100%}
 @keyframes bt-fade-out{from{opacity:1}to{opacity:0}}
 [data-composer-card]{display:flex!important;flex-direction:row;flex-wrap:wrap;align-items:center;gap:0!important;min-height:44px;border-radius:22px!important;padding:7.5px!important;box-sizing:border-box;background:var(--bt-main)!important;border:.5px solid var(--bt-line-2)!important;box-shadow:0 2px 8px -1px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.03),0 0 0 1px rgba(228,228,228,.04)!important;transition:border-color .15s ease,background-color .15s ease,${spring(SPRING_SHAPE, "border-radius")}!important}
 [data-composer-card]:hover,[data-composer-card]:focus-within{border-color:color-mix(in srgb,var(--bt-ink) 30%,transparent)!important}
-[data-composer-card]:has(> [data-slot="conversation.input.attachments"] *),[data-composer-card]:has([data-composer-input] br + *),[data-composer-card]:has([data-composer-input] > :nth-child(2)){border-radius:18px!important}
+[data-composer-card]:has(> [data-slot="conversation.input.attachments"] *),[data-composer-card]:has(> [class*="_rail"] *),[data-composer-card]:has([data-composer-input] br + *),[data-composer-card]:has([data-composer-input] > :nth-child(2)){border-radius:18px!important}
 [class*="_root"]:has(> [data-composer-card]){padding:0 11px 13px 16px!important}
 [class*="_root"]:has(> [data-composer-card])>[data-composer-card]{max-width:min(992px,100%)!important}
 [data-composer-card]>[class*="_row"]{display:contents!important}
 [data-composer-card] [class*="_tools"]{order:1;flex:none;align-self:flex-end;margin:0}
 [data-composer-card]>[data-input-scroll]{order:2;flex:1 1 0;min-width:0;padding:0 8px!important;margin:0!important}
 [data-composer-card] [class*="_trailing"]{order:3;flex:none;align-self:flex-end;margin:0}
-[data-composer-card]>[data-slot="conversation.input.attachments"]{order:0;flex-basis:100%}
+[data-composer-card]>[data-slot="conversation.input.attachments"],[data-composer-card]>[class*="_rail"]{order:0;flex-basis:100%;width:100%}
 [data-composer-card] [data-composer-input]{min-height:24px;padding:2px 0!important}
 [data-composer-card] [data-composer-placeholder]{left:0!important;top:2px!important}
 [data-composer-placeholder]{font-size:0!important;line-height:0!important}
@@ -2932,6 +2932,93 @@ div:has(> nav [class*="_marks"]){display:none!important}
   }
   .bt-drawer-head {
     height: 52px;
+  }
+
+  /* 7. 手机端聊天输入框重塑：满宽纵向卡片，支持长文本横排与顶部附件预览 */
+  [data-composer-card] {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    min-height: auto !important;
+    border-radius: 18px !important;
+    padding: 10px 14px 8px !important;
+    gap: 4px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  [class*="_root"]:has(> [data-composer-card]) {
+    padding: 0 8px 8px !important;
+    max-width: 100% !important;
+  }
+  [class*="_root"]:has(> [data-composer-card]) > [data-composer-card] {
+    max-width: 100% !important;
+  }
+
+  /* 附件区域：独占顶部整行 */
+  [data-composer-card] > [class*="_rail"],
+  [data-composer-card] > [data-slot="conversation.input.attachments"] {
+    order: 0 !important;
+    width: 100% !important;
+    flex: none !important;
+    margin-bottom: 4px !important;
+  }
+
+  /* 输入文字区域：占满中间整行宽度，拒绝狭窄挤压 */
+  [data-composer-card] > [data-input-scroll] {
+    order: 1 !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 auto !important;
+    padding: 2px 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+  [data-composer-card] [data-composer-input] {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    font-size: 15px !important;
+    line-height: 22px !important;
+    min-height: 24px !important;
+    padding: 0 !important;
+    word-break: break-word !important;
+  }
+  [data-composer-card] [data-composer-placeholder] {
+    left: 0 !important;
+    top: 0 !important;
+  }
+  [data-composer-placeholder]::after {
+    font-size: 15px !important;
+    line-height: 22px !important;
+  }
+
+  /* 底部操作行：恢复水平 flex 布局，加号居左，发送与语音居右 */
+  [data-composer-card] > [class*="_row"] {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+    order: 2 !important;
+    margin-top: 4px !important;
+    padding: 0 !important;
+  }
+  [data-composer-card] [class*="_tools"] {
+    order: 1 !important;
+    flex: none !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin: 0 !important;
+  }
+  [data-composer-card] [class*="_trailing"] {
+    order: 2 !important;
+    flex: none !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin: 0 !important;
   }
 }
 `;
