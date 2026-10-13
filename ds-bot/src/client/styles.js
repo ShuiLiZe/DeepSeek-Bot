@@ -1266,6 +1266,239 @@ div:has(> nav [class*="_marks"]){display:none!important}
   .bt-model-trigger {
     min-height: 40px !important;
   }
+
+  /* 9. 设置弹窗手机端全屏化：居中模态在窄屏上浪费四周，改铺满整屏 */
+  .bt-settings-layer {
+    align-items: stretch !important;
+    justify-content: stretch !important;
+  }
+  .bt-settings,
+  .bt-settings[data-wide] {
+    --bt-set-w: 100vw !important;
+    --bt-set-h: 100% !important;
+    width: 100vw !important;
+    height: 100% !important;
+    max-width: 100vw !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    transition: none !important;
+  }
+
+  /* 10. 设置左导航列收窄：198px 在 360px 宽屏上占掉 55%，内容列被挤没。
+     收窄到 76px 只留图标 + 横向可滚，标题在内容区顶部照常显示。 */
+  .bt-settings-nav {
+    width: 76px !important;
+    padding: 12px 6px !important;
+    gap: 4px !important;
+  }
+  .bt-settings-item {
+    flex-direction: column !important;
+    gap: 3px !important;
+    padding: 8px 2px !important;
+    font-size: 10px !important;
+    line-height: 13px !important;
+    text-align: center !important;
+    justify-content: center !important;
+    min-height: 52px !important;
+  }
+  .bt-settings-item svg {
+    flex: none !important;
+    width: 20px !important;
+    height: 20px !important;
+  }
+  .bt-settings-nav > .bt-thumb {
+    left: 6px !important;
+    right: 6px !important;
+  }
+  /* 内容列按收窄后的导航宽重算，usage 离屏副本同步左移 */
+  .bt-settings-main {
+    width: calc(100vw - 76px) !important;
+    height: 100% !important;
+  }
+  .bt-settings-usage[data-off] {
+    left: 76px !important;
+    width: calc(100vw - 76px) !important;
+  }
+  .bt-settings-head {
+    padding: 12px 52px 4px 16px !important;
+  }
+  .bt-settings-scroll {
+    padding: 10px 14px 20px !important;
+    gap: 16px !important;
+  }
+  .bt-settings-close {
+    top: 10px !important;
+    right: 10px !important;
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  /* 11. 设置卡片行：控制件换行到下方，不再和标签挤在同一行 */
+  .bt-set-row {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding: 12px !important;
+    font-size: 14px !important;
+    line-height: 20px !important;
+  }
+  .bt-set-copy {
+    flex: 1 1 100% !important;
+  }
+  .bt-set-control {
+    flex: 1 1 100% !important;
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+  .bt-set-control .bt-select {
+    width: 100% !important;
+    height: 40px !important;
+    font-size: 15px !important;
+  }
+  .bt-set-bot {
+    gap: 10px !important;
+  }
+  .bt-set-hint {
+    font-size: 12px !important;
+    line-height: 17px !important;
+  }
+  button.bt-set-row {
+    min-height: 52px !important;
+  }
+
+  /* 12. 用量页：统计网格是 1.6fr+3 列，窄屏下必然溢出。
+     改 2×2 网格；主数字降字号，图表左边距减半并压缩刻度。 */
+  .bt-us {
+    gap: 12px !important;
+  }
+  .bt-us-top {
+    gap: 8px !important;
+  }
+  .bt-us-stats {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .bt-us-stat {
+    padding: 12px 14px !important;
+  }
+  .bt-us-stat + .bt-us-stat {
+    border-left: 0 !important;
+  }
+  /* 2×2 网格的内部分隔线：右列左侧竖线、下排顶部横线 */
+  .bt-us-stats > .bt-us-stat:nth-child(2n) {
+    border-left: 1px solid var(--bt-line) !important;
+  }
+  .bt-us-stats > .bt-us-stat:nth-child(n + 3) {
+    border-top: 1px solid var(--bt-line) !important;
+  }
+  .bt-us-stat-main {
+    grid-column: 1 / -1 !important;
+    border-left: 0 !important;
+  }
+  .bt-us-stat-main .bt-us-stat-value {
+    font-size: 28px !important;
+    line-height: 34px !important;
+  }
+  .bt-us-stat-value {
+    flex-wrap: wrap !important;
+    font-size: 19px !important;
+    line-height: 25px !important;
+    gap: 4px !important;
+  }
+  .bt-us-stat-value small {
+    font-size: 12px !important;
+  }
+  .bt-us-card {
+    padding: 12px 14px 14px !important;
+  }
+  .bt-us-card-head {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    min-height: 0 !important;
+  }
+  .bt-us-chart-body {
+    padding-top: 4px !important;
+  }
+  .bt-us-plot,
+  .bt-us-ticks {
+    margin-left: 32px !important;
+  }
+  .bt-us-plot {
+    height: 168px !important;
+  }
+  .bt-us-grid span {
+    right: calc(100% + 6px) !important;
+    font-size: 9px !important;
+  }
+  .bt-us-ticks {
+    font-size: 9px !important;
+  }
+  .bt-us-stack {
+    width: 62% !important;
+    max-width: 20px !important;
+  }
+  .bt-us-legend {
+    gap: 5px !important;
+  }
+  .bt-us-key {
+    height: 28px !important;
+    font-size: 11px !important;
+    padding: 0 10px 0 8px !important;
+  }
+  /* 双列卡片在手机上改成单列堆叠 */
+  .bt-us-pair {
+    grid-template-columns: 1fr !important;
+  }
+  .bt-us-row {
+    padding: 8px 6px !important;
+    gap: 10px !important;
+  }
+  .bt-us-row-num {
+    min-width: 46px !important;
+  }
+  .bt-us-profile {
+    gap: 14px !important;
+  }
+  .bt-us-ring {
+    width: 76px !important;
+    height: 76px !important;
+  }
+  .bt-us-profile-copy h3 {
+    font-size: 18px !important;
+    line-height: 24px !important;
+  }
+  /* 自定义范围选择器：两个 252px 月份并排必然溢出，改单列并收窄日格 */
+  .bt-us-pick {
+    left: 0 !important;
+    right: 0 !important;
+    max-width: none !important;
+    padding: 12px 12px 10px !important;
+    border-radius: 14px !important;
+  }
+  .bt-us-pick-months {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+  .bt-us-month {
+    width: 100% !important;
+  }
+  .bt-us-weekdays,
+  .bt-us-days {
+    grid-template-columns: repeat(7, 1fr) !important;
+  }
+  .bt-us-day {
+    height: 34px !important;
+  }
+  .bt-us-heat-months,
+  .bt-us-heat-grid {
+    gap: 2px !important;
+  }
+  .bt-us-heat-months {
+    font-size: 9px !important;
+  }
+  .bt-us-empty {
+    padding: 48px 12px !important;
+  }
 }
 `
 
