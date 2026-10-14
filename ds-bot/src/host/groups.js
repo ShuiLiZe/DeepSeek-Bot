@@ -680,8 +680,11 @@ export function install(rt) {
     const member = rt.botOf(botId)
     const sessionId = room?.sessions?.[botId]
     if (room === undefined || member === undefined || sessionId === undefined || rt.live.get(sessionId)?.turn === undefined) return false
-    const agent = await rt.resolveAgent(sessionId)
-    agent.cancel({ kind: 'user' })
+    const agent = await rt.resolveAgent(sessionId).catch(() => undefined)
+    // A Session that cannot be resolved has no turn left to cancel, and no `turn/end`
+    // will come: clear the entry here instead of leaving the Bot shown as working.
+    if (agent === undefined) rt.clearLiveTurn(sessionId)
+    else rt.stopTurn(sessionId, undefined, () => agent.cancel({ kind: 'user' }))
     await postToRoom(room, member, '', { quiet: true, stopped: true })
     return true
   }

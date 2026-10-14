@@ -70,6 +70,9 @@ export const ROOM_LATE_ROUNDS = 10
 // A member still at work this long after its first tool call lets the round go on; it
 // posts its reply when the work is done.
 export const ROOM_WORK_GRACE_MS = 15_000
+// A stopped turn usually ends with a `turn/end` event. A Session that is going away can
+// swallow it, so a stop also clears the turn's work view after this long.
+export const STOPPED_SETTLE_MS = 15_000
 
 export const OWN_CHAT_LINE_MAX = 400
 // The message an anchor points at is shown whole (up to this), so a long draft takes
