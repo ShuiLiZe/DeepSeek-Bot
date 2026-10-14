@@ -638,6 +638,10 @@ export const SIDEBAR_CSS = `
 [class*="_footArea"]:has(.bt-foot-account) .bt-connect-foot{order:0;flex:0 0 36px;width:36px;height:36px;min-width:36px;max-width:36px;padding:0;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;gap:0}
 [class*="_footArea"]:has(.bt-foot-account) .bt-connect-foot .bt-connect-label{display:none!important}
 .bt-connect-warn{display:none!important}
+/* The foot button is an icon-only circle. Keyed on the plugin's own class so it
+   holds even where the shell's footer container is not named "_footArea". */
+.bt-connect-foot{order:0!important;flex:0 0 36px!important;width:36px!important;height:36px!important;min-width:36px!important;max-width:36px!important;padding:0!important;border-radius:999px!important;overflow:hidden!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:0!important}
+.bt-connect-foot .bt-connect-label{display:none!important}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{order:1;flex:none}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
 

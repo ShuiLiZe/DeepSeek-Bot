@@ -1965,7 +1965,8 @@ body[data-bt-motion=quiet] .bt-mark[data-poke]{cursor:default}
 .bt-rail{align-items:center;padding:0 0 8px}
 .bt-rail .bt-row{justify-content:center;padding:6px 0;min-height:44px}
 .bt-side-foot{display:flex;padding-top:8px}
-.bt-connect{flex:1;height:36px;border-radius:999px;border:1px solid var(--bt-line);background:var(--bt-main);color:var(--bt-ink);font-family:inherit;font-size:14px;line-height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background-color .12s ease}
+.bt-connect{flex:1;height:36px;border-radius:999px;border:1px solid var(--bt-line);background:var(--bt-main);color:var(--bt-ink);font-family:inherit;font-size:14px;line-height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background-color .12s ease;white-space:nowrap;overflow:hidden}
+.bt-connect-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .bt-connect:hover{background:var(--bt-hover)}
 .bt-connect svg{flex:none;width:15px;height:15px}
 .bt-connect-wrap{position:relative;display:flex;flex:1 1 auto;min-width:0}
@@ -2580,7 +2581,7 @@ body[data-ds-dark-theme] .bt-theme-chip i{background:var(--da)}
 .bt-mem-send>*{animation:bt-check-pop ${SPRING_POP.duration}ms ${SPRING_POP.easing}}
 .bt-mem-spin{width:14px;height:14px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;box-sizing:border-box;animation:bt-mem-spin .7s linear infinite}
 @keyframes bt-mem-spin{to{transform:rotate(360deg)}}
-@media (max-width:640px){.bt-mem{width:100vw;height:100%;border-radius:0;border:0}.bt-mem-body{padding:18px 18px 20px}.bt-mem-foot{padding:8px 12px 12px}}
+@media (max-width:899.98px){.bt-mem{width:100vw;height:100%;border-radius:0;border:0}.bt-mem-body{padding:18px 18px 20px}.bt-mem-foot{padding:8px 12px 12px}}
 @media (prefers-reduced-motion:reduce){.bt-mem,.bt-mem-scrim,.bt-mem-summary>*,.bt-mem-empty,.bt-mem-reply,.bt-mem-skel-block span,.bt-mem-entries,.bt-mem-send>*,.bt-mem-changes li svg{animation:none}}
 
 .bt-thumb{position:absolute;left:0;top:0;z-index:0;pointer-events:none;transition:opacity .14s ease}
@@ -2801,7 +2802,11 @@ div:has(> nav [class*="_marks"]){display:none!important}
 .bt-part-line{display:flex;align-items:center;gap:10px;margin:10px 0 6px;font-size:11px;line-height:14px;color:var(--bt-ink-3)}
 .bt-part-line::before,.bt-part-line::after{content:"";flex:1;height:1px;background:var(--bt-line)}
 
-@media (max-width: 768px), (pointer: coarse) {
+/* Phone layout. dsh-mobile switches its own shell to the drawer layout at
+   max-width:899px, so the breakpoint must match it: below 900px the drawer is
+   already showing, and rules keyed to a narrower query would leave parts of the
+   panel in their desktop shape. 899.98px is the sub-pixel-safe form of "<= 899". */
+@media (max-width: 899.98px), (pointer: coarse) {
   /* 1. 左侧边栏抽屉紧凑收拢，避免空旷笨重 */
   .dshm-drawer[data-open=true],
   [data-pane="sidebar"][data-open=true],
@@ -6042,6 +6047,10 @@ var SIDEBAR_CSS = `
 [class*="_footArea"]:has(.bt-foot-account) .bt-connect-foot{order:0;flex:0 0 36px;width:36px;height:36px;min-width:36px;max-width:36px;padding:0;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;gap:0}
 [class*="_footArea"]:has(.bt-foot-account) .bt-connect-foot .bt-connect-label{display:none!important}
 .bt-connect-warn{display:none!important}
+/* The foot button is an icon-only circle. Keyed on the plugin's own class so it
+   holds even where the shell's footer container is not named "_footArea". */
+.bt-connect-foot{order:0!important;flex:0 0 36px!important;width:36px!important;height:36px!important;min-width:36px!important;max-width:36px!important;padding:0!important;border-radius:999px!important;overflow:hidden!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:0!important}
+.bt-connect-foot .bt-connect-label{display:none!important}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{order:1;flex:none}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
 
