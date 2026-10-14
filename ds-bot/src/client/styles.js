@@ -980,6 +980,548 @@ div:has(> nav [class*="_marks"]){display:none!important}
 .bt-earlier .bt-event{margin:4px 0}
 .bt-part-line{display:flex;align-items:center;gap:10px;margin:10px 0 6px;font-size:11px;line-height:14px;color:var(--bt-ink-3)}
 .bt-part-line::before,.bt-part-line::after{content:"";flex:1;height:1px;background:var(--bt-line)}
+
+@media (max-width: 768px), (pointer: coarse) {
+  /* 1. 左侧边栏抽屉紧凑收拢，避免空旷笨重 */
+  .dshm-drawer[data-open=true],
+  [data-pane="sidebar"][data-open=true],
+  .bt-side {
+    width: min(72vw, 276px) !important;
+    max-width: 280px !important;
+  }
+
+  /* 2. 右侧会话详情抽屉适度收拢与背景半透明遮罩 */
+  .bt-panel-backdrop {
+    display: block !important;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 245 !important;
+    background: rgba(15, 23, 42, .38) !important;
+    backdrop-filter: blur(2px) !important;
+    -webkit-backdrop-filter: blur(2px) !important;
+    animation: bt-fade-in .15s ease-out !important;
+  }
+  .bt-panel,
+  [data-dsh-mobile-details],
+  aside.bt-panel {
+    z-index: 250 !important;
+    width: min(74vw, 290px) !important;
+    max-width: 295px !important;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, .25) !important;
+  }
+  .bt-panel-grip {
+    display: none !important;
+  }
+
+  /* 3. 左侧边栏底部连接插件与工具按钮图标化排布 */
+  .bt-connect-wrap {
+    flex: none !important;
+  }
+  .bt-connect-foot {
+    width: 36px !important;
+    min-width: 36px !important;
+    max-width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    font-size: 0 !important;
+    flex: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  .bt-connect-foot svg {
+    width: 17px !important;
+    height: 17px !important;
+    margin: 0 !important;
+  }
+  .bt-connect-label {
+    display: none !important;
+  }
+  [class*="_footArea"] {
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+  }
+
+  /* 4. 新建聊天 / 创建 Bot 全局置顶与移动端视口铺满 */
+  .bt-pane {
+    left: 0 !important;
+    right: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    z-index: 600 !important;
+    background: var(--bt-main) !important;
+  }
+  .bt-newchat {
+    padding: 12px 14px !important;
+  }
+  .bt-to {
+    padding: 8px 12px !important;
+    gap: 6px !important;
+  }
+  .bt-to input {
+    font-size: 15px !important;
+  }
+  .bt-drop {
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: 52vh !important;
+  }
+  .bt-x {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 20px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  .bt-nc-card {
+    max-width: 100% !important;
+  }
+
+  /* 5. 搜索 Command Palette 全局置顶与移动端弹层重塑 */
+  .bt-palette-layer {
+    z-index: 600 !important;
+  }
+  .bt-palette {
+    top: 14px !important;
+    left: 12px !important;
+    right: 12px !important;
+    bottom: auto !important;
+    width: auto !important;
+    max-width: calc(100vw - 24px) !important;
+    transform: none !important;
+    border-radius: 16px !important;
+    max-height: calc(100dvh - 28px) !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .3) !important;
+  }
+  .bt-palette-head {
+    height: 48px !important;
+    padding: 0 12px !important;
+    gap: 8px !important;
+  }
+  .bt-palette-head input {
+    font-size: 15px !important;
+  }
+  .bt-palette-list {
+    height: auto !important;
+    max-height: min(380px, calc(72dvh - 56px)) !important;
+  }
+  .bt-palette-close {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 4px 8px !important;
+    border: 0 !important;
+    background: none !important;
+    color: var(--bt-accent, #0066cc) !important;
+    font: inherit !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+  }
+
+  /* 6. 小鲸鱼头像菜单置顶与触控优化 */
+  .bt-account-menu {
+    z-index: 500 !important;
+    left: 12px !important;
+    bottom: 60px !important;
+    max-width: min(280px, calc(100vw - 24px)) !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .28) !important;
+  }
+  .bt-bubble {
+    max-width: 92% !important;
+  }
+  .bt-ububble {
+    max-width: 90% !important;
+  }
+  .bt-return {
+    min-height: 42px;
+    padding: 0 16px;
+  }
+  .bt-head {
+    height: 52px;
+    padding: 0 12px;
+  }
+  .bt-drawer-head {
+    height: 52px;
+  }
+
+  /* 7. 手机端聊天输入框重塑：满宽纵向卡片，支持长文本横排与顶部附件预览 */
+  [data-composer-card] {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    min-height: auto !important;
+    border-radius: 18px !important;
+    padding: 10px 14px 8px !important;
+    gap: 4px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  [class*="_root"]:has(> [data-composer-card]) {
+    padding: 0 8px 8px !important;
+    max-width: 100% !important;
+  }
+  [class*="_root"]:has(> [data-composer-card]) > [data-composer-card] {
+    max-width: 100% !important;
+  }
+
+  /* 附件区域：独占顶部整行 */
+  [data-composer-card] > [class*="_rail"],
+  [data-composer-card] > [data-slot="conversation.input.attachments"] {
+    order: 0 !important;
+    width: 100% !important;
+    flex: none !important;
+    margin-bottom: 4px !important;
+  }
+
+  /* 输入文字区域：占满中间整行宽度，拒绝狭窄挤压 */
+  [data-composer-card] > [data-input-scroll] {
+    order: 1 !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 auto !important;
+    padding: 2px 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+  [data-composer-card] [data-composer-input] {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    font-size: 15px !important;
+    line-height: 22px !important;
+    min-height: 24px !important;
+    padding: 0 !important;
+    word-break: break-word !important;
+  }
+  [data-composer-card] [data-composer-placeholder] {
+    left: 0 !important;
+    top: 0 !important;
+  }
+  [data-composer-placeholder]::after {
+    font-size: 15px !important;
+    line-height: 22px !important;
+  }
+
+  /* 底部操作行：恢复水平 flex 布局，加号居左，发送与语音居右 */
+  [data-composer-card] > [class*="_row"] {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+    order: 2 !important;
+    margin-top: 4px !important;
+    padding: 0 !important;
+  }
+  [data-composer-card] [class*="_tools"] {
+    order: 1 !important;
+    flex: none !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin: 0 !important;
+  }
+  [data-composer-card] [class*="_trailing"] {
+    order: 2 !important;
+    flex: none !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin: 0 !important;
+  }
+
+  /* 8. 工作文件夹菜单：手机端全宽底部弹层，任何设置面板都压不住它 */
+  .bt-menu {
+    z-index: 900 !important;
+    max-height: min(62dvh, 520px) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    border-radius: 14px !important;
+    box-shadow: 0 16px 44px rgba(0, 0, 0, .34) !important;
+  }
+  .bt-menu button {
+    min-height: 44px !important;
+    font-size: 15px !important;
+    padding: 10px 12px !important;
+  }
+  .bt-folder-menu {
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+  .bt-folder-path,
+  .bt-folder-here {
+    font-size: 12px !important;
+    line-height: 16px !important;
+  }
+  .bt-folder-input {
+    height: 40px !important;
+    font-size: 15px !important;
+  }
+  .bt-model-trigger {
+    min-height: 40px !important;
+  }
+
+  /* 9. 设置弹窗手机端全屏化：居中模态在窄屏上浪费四周，改铺满整屏 */
+  .bt-settings-layer {
+    align-items: stretch !important;
+    justify-content: stretch !important;
+  }
+  .bt-settings,
+  .bt-settings[data-wide] {
+    --bt-set-w: 100vw !important;
+    --bt-set-h: 100% !important;
+    width: 100vw !important;
+    height: 100% !important;
+    max-width: 100vw !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    transition: none !important;
+  }
+
+  /* 10. 设置左导航列收窄：198px 在 360px 宽屏上占掉 55%，内容列被挤没。
+     收窄到 76px 只留图标 + 横向可滚，标题在内容区顶部照常显示。 */
+  .bt-settings-nav {
+    width: 76px !important;
+    padding: 12px 6px !important;
+    gap: 4px !important;
+  }
+  .bt-settings-item {
+    flex-direction: column !important;
+    gap: 3px !important;
+    padding: 8px 2px !important;
+    font-size: 10px !important;
+    line-height: 13px !important;
+    text-align: center !important;
+    justify-content: center !important;
+    min-height: 52px !important;
+  }
+  .bt-settings-item svg {
+    flex: none !important;
+    width: 20px !important;
+    height: 20px !important;
+  }
+  .bt-settings-nav > .bt-thumb {
+    left: 6px !important;
+    right: 6px !important;
+  }
+  /* 内容列按收窄后的导航宽重算，usage 离屏副本同步左移 */
+  .bt-settings-main {
+    width: calc(100vw - 76px) !important;
+    height: 100% !important;
+  }
+  .bt-settings-usage[data-off] {
+    left: 76px !important;
+    width: calc(100vw - 76px) !important;
+  }
+  .bt-settings-head {
+    padding: 12px 52px 4px 16px !important;
+  }
+  .bt-settings-scroll {
+    padding: 10px 14px 20px !important;
+    gap: 16px !important;
+  }
+  .bt-settings-close {
+    top: 10px !important;
+    right: 10px !important;
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  /* 11. 设置卡片行：控制件换行到下方，不再和标签挤在同一行 */
+  .bt-set-row {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding: 12px !important;
+    font-size: 14px !important;
+    line-height: 20px !important;
+  }
+  .bt-set-copy {
+    flex: 1 1 100% !important;
+  }
+  .bt-set-control {
+    flex: 1 1 100% !important;
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+  .bt-set-control .bt-select {
+    width: 100% !important;
+    height: 40px !important;
+    font-size: 15px !important;
+  }
+  .bt-set-bot {
+    gap: 10px !important;
+  }
+  .bt-set-hint {
+    font-size: 12px !important;
+    line-height: 17px !important;
+  }
+  button.bt-set-row {
+    min-height: 52px !important;
+  }
+
+  /* 12. 用量页：统计网格是 1.6fr+3 列，窄屏下必然溢出。
+     改 2×2 网格；主数字降字号，图表左边距减半并压缩刻度。 */
+  .bt-us {
+    gap: 12px !important;
+  }
+  .bt-us-top {
+    gap: 8px !important;
+  }
+  .bt-us-stats {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .bt-us-stat {
+    padding: 12px 14px !important;
+  }
+  .bt-us-stat + .bt-us-stat {
+    border-left: 0 !important;
+  }
+  /* 2×2 网格的内部分隔线：右列左侧竖线、下排顶部横线 */
+  .bt-us-stats > .bt-us-stat:nth-child(2n) {
+    border-left: 1px solid var(--bt-line) !important;
+  }
+  .bt-us-stats > .bt-us-stat:nth-child(n + 3) {
+    border-top: 1px solid var(--bt-line) !important;
+  }
+  .bt-us-stat-main {
+    grid-column: 1 / -1 !important;
+    border-left: 0 !important;
+  }
+  .bt-us-stat-main .bt-us-stat-value {
+    font-size: 28px !important;
+    line-height: 34px !important;
+  }
+  .bt-us-stat-value {
+    flex-wrap: wrap !important;
+    font-size: 19px !important;
+    line-height: 25px !important;
+    gap: 4px !important;
+  }
+  .bt-us-stat-value small {
+    font-size: 12px !important;
+  }
+  .bt-us-card {
+    padding: 12px 14px 14px !important;
+  }
+  .bt-us-card-head {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    min-height: 0 !important;
+  }
+  .bt-us-chart-body {
+    padding-top: 4px !important;
+  }
+  .bt-us-plot,
+  .bt-us-ticks {
+    margin-left: 32px !important;
+  }
+  .bt-us-plot {
+    height: 168px !important;
+  }
+  .bt-us-grid span {
+    right: calc(100% + 6px) !important;
+    font-size: 9px !important;
+  }
+  .bt-us-ticks {
+    font-size: 9px !important;
+  }
+  .bt-us-stack {
+    width: 62% !important;
+    max-width: 20px !important;
+  }
+  .bt-us-legend {
+    gap: 5px !important;
+  }
+  .bt-us-key {
+    height: 28px !important;
+    font-size: 11px !important;
+    padding: 0 10px 0 8px !important;
+  }
+  /* 双列卡片在手机上改成单列堆叠 */
+  .bt-us-pair {
+    grid-template-columns: 1fr !important;
+  }
+  .bt-us-row {
+    padding: 8px 6px !important;
+    gap: 10px !important;
+  }
+  .bt-us-row-num {
+    min-width: 46px !important;
+  }
+  .bt-us-profile {
+    gap: 14px !important;
+  }
+  .bt-us-ring {
+    width: 76px !important;
+    height: 76px !important;
+  }
+  .bt-us-profile-copy h3 {
+    font-size: 18px !important;
+    line-height: 24px !important;
+  }
+  /* 自定义范围选择器：两个 252px 月份并排必然溢出，改单列并收窄日格 */
+  .bt-us-pick {
+    left: 0 !important;
+    right: 0 !important;
+    max-width: none !important;
+    padding: 12px 12px 10px !important;
+    border-radius: 14px !important;
+  }
+  .bt-us-pick-months {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+  .bt-us-month {
+    width: 100% !important;
+  }
+  .bt-us-weekdays,
+  .bt-us-days {
+    grid-template-columns: repeat(7, 1fr) !important;
+  }
+  .bt-us-day {
+    height: 34px !important;
+  }
+  .bt-us-heat-months,
+  .bt-us-heat-grid {
+    gap: 2px !important;
+  }
+  .bt-us-heat-months {
+    font-size: 9px !important;
+  }
+  .bt-us-empty {
+    padding: 48px 12px !important;
+  }
+  /* 13. 弹窗层级：dsh-mobile 的抽屉 z-index 是 70、详情 80、浮层 90，而 ds-bot 的
+     设置弹窗只有 60，会被抽屉整个盖住（在侧栏里点小鲸鱼 → Bot settings 就是这样）。
+     全屏模态必须压在抽屉之上，同时保持弹窗之间的相对次序：记忆 61 < 搜索 70 < 设置。 */
+  .bt-settings-layer {
+    z-index: 320 !important;
+  }
+  .bt-mem-layer {
+    z-index: 300 !important;
+  }
+  .bt-palette-layer {
+    z-index: 310 !important;
+  }
+  .bt-react-strip {
+    z-index: 290 !important;
+  }
+}
+
 `
 
 // -------------------------------------------------------------------------

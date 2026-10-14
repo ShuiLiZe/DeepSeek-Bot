@@ -266,15 +266,30 @@ export function TeamSidebar(props) {
     event.preventDefault()
     actions.openPalette(event.key)
   }
+  // Opening a view from the sidebar closes the mobile drawer it was opened from,
+  // so the view is not left behind the drawer on a phone.
+  const dismissMobileDrawer = () => {
+    const toggle = document.querySelector('[data-dsh-mobile-toggle]') || document.querySelector('button[class*="_toggle"]')
+    const drawer = document.querySelector('.dshm-drawer[data-open=true]') || document.querySelector('[data-pane="sidebar"][data-open=true]')
+    if (drawer && toggle) toggle.click()
+  }
+  const onSearchClick = () => {
+    dismissMobileDrawer()
+    actions.openPalette()
+  }
+  const onNewChatClick = () => {
+    dismissMobileDrawer()
+    actions.openNewChat('new')
+  }
   return h('div', { className: wide ? 'bt-side' : 'bt-side bt-rail', onKeyDown: typeToSearch },
     wide ? h('div', { className: 'bt-side-top' },
       h('span', { className: 'bt-brand' }, h(BrandMark, { size: 22 }), h(BrandName)),
       h(UpdateButton, { useUpdate: props.useUpdate, actions }),
-      h('button', { type: 'button', className: 'bt-round', 'aria-label': t('Search'), title: t('Search'), onClick: () => actions.openPalette() }, h(SearchIcon)),
-      h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: () => actions.openNewChat('new') }, h(PlusIcon)))
+      h('button', { type: 'button', className: 'bt-round', 'aria-label': t('Search'), title: t('Search'), onClick: onSearchClick }, h(SearchIcon)),
+      h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: onNewChatClick }, h(PlusIcon)))
       : h(Fragment, null,
           h(UpdateButton, { useUpdate: props.useUpdate, actions }),
-          h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: () => actions.openNewChat('new') }, h(PlusIcon))),
+          h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: onNewChatClick }, h(PlusIcon))),
     wide && roster.readOnly ? h('div', { className: 'bt-hint bt-read-only', role: 'status' }, hostText(roster.readOnly)) : null,
     h('div', { ref: listRef, className: 'bt-list', role: 'region', 'aria-label': t('Bot list') },
       main ? h(BotRow, { ...rowProps, bot: main, marked: markedUnread[main.id] === true }) : roster.ready ? null : h('div', { className: 'bt-hint' }, t('Setting up your Main Bot…')),
@@ -395,10 +410,11 @@ export function ConnectPlugins({ wide, actions }) {
   return h('span', { className: 'bt-connect-wrap' },
     h('button', {
       ref: button, type: 'button', className: 'bt-connect bt-connect-foot', 'aria-describedby': tip ? tipId : undefined,
+      'aria-label': t('Connect plugins'), title: t('Connect plugins'),
       onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide,
       onClick: () => actions.selectPanel('plugins'),
     },
-    h(PlugIcon), t('Connect plugins'), h('span', { className: 'bt-connect-warn', 'aria-hidden': true }, '!')),
+    h(PlugIcon), h('span', { className: 'bt-connect-label' }, t('Connect plugins'))),
     tip && box ? createPortal(h('span', { role: 'tooltip', id: tipId, className: 'bt-connect-tip', style: box },
       t('Plugin compatibility is not fully verified.')), document.body) : null)
 }
@@ -499,12 +515,21 @@ export function AccountLauncher({ seat = true, settingsOpen, openSettings, openO
     }
     const onKey = (event) => { if (event.key === 'Escape') { event.stopPropagation(); setOpen(false); button.current?.focus() } }
     window.addEventListener('mousedown', onDown)
+    window.addEventListener('touchstart', onDown, { passive: true })
     window.addEventListener('keydown', onKey, true)
-    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey, true) }
+    return () => {
+      window.removeEventListener('mousedown', onDown)
+      window.removeEventListener('touchstart', onDown)
+      window.removeEventListener('keydown', onKey, true)
+    }
   }, [open])
-  const toggle = () => {
+  const toggle = (event) => {
+    event?.stopPropagation?.()
     const rect = button.current?.getBoundingClientRect()
-    if (rect) setBox({ left: rect.left, bottom: window.innerHeight - rect.top + 5 })
+    if (rect) {
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - 268))
+      setBox({ left, bottom: window.innerHeight - rect.top + 5 })
+    }
     setOpen(value => !value)
   }
   const groups = [
@@ -609,7 +634,10 @@ export const SIDEBAR_CSS = `
 [class*="_footArea"]:has(.bt-foot-account){display:flex!important;flex-direction:row!important;align-items:center;gap:6px}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_footerActions"],[class*="_footArea"]:has(.bt-foot-account)>[class*="_footerActions"]>div{display:contents!important}
 .bt-foot-account{order:-1;flex:none;display:inline-flex}
-[class*="_footArea"]:has(.bt-foot-account) .bt-connect-foot{order:0;flex:1 1 auto;min-width:0;width:auto}
+[class*="_footArea"]:has(.bt-foot-account) .bt-connect-wrap{order:0;flex:none}
+[class*="_footArea"]:has(.bt-foot-account) .bt-connect-foot{order:0;flex:0 0 36px;width:36px;height:36px;min-width:36px;max-width:36px;padding:0;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;gap:0}
+[class*="_footArea"]:has(.bt-foot-account) .bt-connect-foot .bt-connect-label{display:none!important}
+.bt-connect-warn{display:none!important}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{order:1;flex:none}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
 
