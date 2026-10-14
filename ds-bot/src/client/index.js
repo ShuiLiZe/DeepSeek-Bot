@@ -337,6 +337,23 @@ export function apply(ctx) {
     for (const [id, owner] of pendingAdopt) if (owner === agentId && !ids.includes(id)) ids.push(id)
     return ids
   }
+  // Back in Bot mode the view must hold a team conversation; an outside Session
+  // left over from Agent mode would wear the Bot skin without one. The roster may
+  // still be loading, so wait for its first snapshot instead of giving up.
+  const home = () => {
+    const pick = () => {
+      const snapshot = roster.getSnapshot()
+      if (!snapshot.ready || !snapshot.mainBotId) return false
+      const list = ctx.sessions.list.getSnapshot()
+      const main = Object.values(list.byId ?? {}).find(session => (session?.retainedBy?.mainView ?? 0) > 0)?.id
+      if (main !== undefined && snapshot.byId[main] === undefined && snapshot.roomsById[main] === undefined) {
+        actions.openSession(snapshot.mainBotId)
+      }
+      return true
+    }
+    if (pick()) return
+    const off = roster.subscribe(() => { if (pick()) off() })
+  }
   const actions = {
     // The full-pane overlays sit above the conversation, so opening one must dismiss them
     // or the click appears to do nothing.
@@ -449,8 +466,8 @@ export function apply(ctx) {
     openMemory: (botId) => { ui.set(state => ({ ...state, memory: botId, menu: null, palette: null })) },
     closeMemory: () => { ui.set(state => (state.memory ? { ...state, memory: null } : state)) },
     openConnectors: () => { ui.set(state => ({ ...state, settings: { page: 'connectors', id: null }, menu: null, palette: null, newChat: null })) },
-    // Agent mode hands the surface back to the shell; everything open on the Bot
-    // surface closes first so nothing stale reopens on the way back.
+    // Back in Bot mode the view must hold a team conversation; an outside
+    // Session left over from Agent mode would wear the Bot skin without one.
     setSurface: (mode) => {
       if (mode !== 'bot' && mode !== 'agent') return
       if (surface.getSnapshot().mode === mode) return
@@ -458,27 +475,23 @@ export function apply(ctx) {
         ui.set(state => ({ ...state, details: null, view: 'details', settings: null, palette: null, newChat: null, menu: null, voice: null, exchange: null, memory: null, toast: null }))
       }
       writeMode(mode)
-      surface.set(state => ({ ...state, mode }))
-      if (mode !== 'bot') return
-      // Back in Bot mode the view must hold a team conversation; an outside
-      // Session left over from Agent mode would wear the Bot skin without one.
-      const home = () => {
-        const snapshot = roster.getSnapshot()
-        if (!snapshot.ready || !snapshot.mainBotId) return
-        const list = ctx.sessions.list.getSnapshot()
-        const main = Object.values(list.byId ?? {}).find(session => (session?.retainedBy?.mainView ?? 0) > 0)?.id
-        if (main !== undefined && snapshot.byId[main] === undefined && snapshot.roomsById[main] === undefined) {
-          actions.openSession(snapshot.mainBotId)
-        }
+      // Swapping the groups is a synchronous unmount/mount, so on its own the whole
+      // interface snaps from one skin to the other. A veil painted over the shell
+      // before the swap and faded out after it turns that snap into a crossfade; it
+      // is the only handle we have, since a group install returns disposers, not a
+      // root element to animate.
+      const veil = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'bt-surface-veil' }))
+      const swap = () => {
+        surface.set(state => ({ ...state, mode }))
+        if (mode === 'bot') home()
+        // Two frames: one for the mounted groups to paint, one to start the fade
+        // against the finished interface instead of an empty shell.
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          veil.classList.add('bt-surface-veil-out')
+          veil.addEventListener('animationend', () => veil.remove(), { once: true })
+        }))
       }
-      if (roster.getSnapshot().ready) home()
-      else {
-        const off = roster.subscribe(() => {
-          if (!roster.getSnapshot().ready) return
-          off()
-          home()
-        })
-      }
+      requestAnimationFrame(swap)
     },
     markUnread: id => setUnread(id, true),
     beginVisit: (id) => {

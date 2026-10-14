@@ -572,8 +572,11 @@ ${SKIN_FOOT}>div:has(> [data-slot="sidebar.settings"]){order:-1!important;flex:n
 .bt-react:active{scale:.92}
 @keyframes bt-react-pop{from{transform:scale(.6);opacity:0}}
 .bt-bubble a[href^="${MENTION_ORIGIN}"] svg{display:none}
-.bt-you{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bt-ink) 5%,var(--bt-sidebar));color:var(--bt-ink-2);box-shadow:inset 0 0 0 1px var(--bt-line);transition:background-color .12s ease}
-button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
+/* The account seat carries the same whale as the brand mark, so it takes the
+   accent colour rather than the muted ink: a grey whale reads as a disabled
+   control next to the bright one in the sidebar head. */
+.bt-you{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bt-accent) 10%,var(--bt-sidebar));color:var(--bt-accent);box-shadow:inset 0 0 0 1px var(--bt-line);transition:background-color .12s ease}
+button:hover .bt-you{background:color-mix(in srgb,var(--bt-accent) 18%,var(--bt-sidebar))}
 .bt-you-wrap{display:inline-flex;padding:0}
 .bt-connect-foot{width:100%;height:36px}
 
@@ -874,6 +877,12 @@ header[class*="_header"] .bt-head{flex:1 1 auto;width:100%}
 }
 @keyframes bt-fade-in{from{opacity:0}to{opacity:1}}
 @keyframes bt-fade-out{from{opacity:1}to{opacity:0}}
+/* Covers the shell across a surface swap so Agent mode and Bot mode cross-fade
+   instead of snapping. It paints the destination background rather than the old
+   one, so the new skin fades in from a flat colour of its own tone. */
+.bt-surface-veil{position:fixed;inset:0;z-index:9999;pointer-events:none;background:var(--bt-main);animation:bt-fade-in .12s ease-out both}
+.bt-surface-veil-out{animation:bt-fade-out .2s ease-out both}
+@media (prefers-reduced-motion:reduce){.bt-surface-veil,.bt-surface-veil-out{animation-duration:.01s}}
 [data-composer-card]{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;gap:0!important;min-height:44px!important;border-radius:22px!important;padding:7.5px!important;box-sizing:border-box;background:var(--bt-main)!important;border:.5px solid var(--bt-line-2)!important;box-shadow:0 2px 8px -1px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.03),0 0 0 1px rgba(228,228,228,.04)!important;transition:border-color .15s ease,background-color .15s ease,${spring(SPRING_SHAPE, 'border-radius')}!important}
 [data-composer-card]:hover,[data-composer-card]:focus-within{border-color:color-mix(in srgb,var(--bt-ink) 30%,transparent)!important}
 [data-composer-card]:has(> [data-slot="conversation.input.attachments"] *),[data-composer-card]:has([data-composer-input] br + *),[data-composer-card]:has([data-composer-input] > :nth-child(2)){border-radius:18px!important}
@@ -993,6 +1002,17 @@ div:has(> nav [class*="_marks"]){display:none!important}
   .bt-side {
     width: min(72vw, 276px) !important;
     max-width: 280px !important;
+  }
+  /* The drawer scrolls, so its scrollbar rides the drawer's right edge while the
+     rows stop 12px short of it and leave a strip of bare track. Give the scroll
+     element the same right inset the rows use, so the bar sits on the content
+     edge the user reads as the list's border. */
+  .dshm-drawer[data-open=true] > * {
+    scrollbar-width: thin !important;
+    padding-right: 12px !important;
+  }
+  .dshm-drawer[data-open=true] .bt-side {
+    padding-right: 0 !important;
   }
 
   /* 2. 右侧会话详情抽屉适度收拢与背景半透明遮罩 */
