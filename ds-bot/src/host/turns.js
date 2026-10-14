@@ -2,7 +2,7 @@
 // triggered, the waiters and inboxes of group rounds, and routing a finished turn's reply.
 //
 // Turn tracking: which turns were triggered by another Bot, and what they said.
-import { REFERENCE_KIND, REPLY_KIND, SOURCE_KIND } from './constants.js'
+import { REFERENCE_KIND, REPLY_KIND, SOURCE_KIND, STOPPED_SETTLE_MS } from './constants.js'
 import { textOf } from './text.js'
 import { reminderText } from './schedules.js'
 
@@ -82,20 +82,74 @@ export function install(rt) {
   // Member turns of a group round the user stopped: what they end with stays out of the group.
   const stoppedRoomTurns = new Set()
 
+  // The live entry is what the mascot and the group's round read to say a Session is
+  // working, and only `turn/end` clears it. A cancel that lands while the Session is
+  // torn down, or a Session that cannot be resolved at all, ends with no `turn/end`, so
+  // the entry would say "working" for the rest of the process's life.
+  const clearLiveTurn = (sessionId, exchangeId) => {
+    const entry = live.get(sessionId)
+    if (entry === undefined || entry.turn === undefined) return
+    if (exchangeId !== undefined && entry.info?.exchangeId !== exchangeId) return
+    setActivity(sessionId, undefined)
+    entry.turn = undefined
+    entry.info = undefined
+    entry.texts = []
+    entry.switched = false
+    entry.joined = []
+    entry.since = undefined
+    entry.tool = undefined
+    entry.calls = undefined
+    entry.lastText = undefined
+    entry.lastCalled = undefined
+  }
+
   // A stopped round stops the member work it started: the turn that answers it, or the
   // delivery still waiting for the member's Session. An earlier turn there keeps going.
   // An exchange whose turn already ended stays in the set, so it is bounded.
   const STOPPED_KEPT = 200
+  /** @type {Map<string, ReturnType<typeof setTimeout>>} a stop's backstop, keyed by Session */
+  const stopSettleTimers = new Map()
+  // `turn/end` for a cancelled turn may never arrive, so a stop arms a backstop: if the
+  // entry still names the stopped turn after a grace period, the stop is taken as final
+  // and the entry is cleared. A `turn/end` that does arrive disarms it.
+  const armStopSettle = (sessionId, exchangeId) => {
+    const armed = stopSettleTimers.get(sessionId)
+    if (armed !== undefined) clearTimeout(armed)
+    const timer = setTimeout(() => {
+      stopSettleTimers.delete(sessionId)
+      clearLiveTurn(sessionId, exchangeId)
+    }, STOPPED_SETTLE_MS)
+    timer.unref?.()
+    stopSettleTimers.set(sessionId, timer)
+  }
+  const disarmStopSettle = (sessionId) => {
+    const timer = stopSettleTimers.get(sessionId)
+    if (timer === undefined) return
+    clearTimeout(timer)
+    stopSettleTimers.delete(sessionId)
+  }
+  // A stop anywhere that cancels a turn the same way: the entry is cleared at once when
+  // there is nothing left to cancel, and a backstop covers a cancelled turn whose
+  // turn/end never arrives.
+  const stopTurn = (sessionId, exchangeId, cancel) => {
+    const entry = live.get(sessionId)
+    if (entry?.turn === undefined) return false
+    if (exchangeId !== undefined && entry.info?.exchangeId !== exchangeId) return false
+    cancel()
+    armStopSettle(sessionId, exchangeId)
+    return true
+  }
   async function stopRoomTurn(sessionId, exchangeId) {
     stoppedRoomTurns.add(exchangeId)
     if (stoppedRoomTurns.size > STOPPED_KEPT) stoppedRoomTurns.delete(stoppedRoomTurns.values().next().value)
     const agent = await rt.resolveAgent(sessionId).catch(() => undefined)
-    if (agent === undefined) return
-    const entry = live.get(sessionId)
-    if (entry?.turn !== undefined && entry.info?.exchangeId === exchangeId) {
-      agent.cancel({ kind: 'hook', reason: 'ds-bot/stopped' })
+    if (agent === undefined) {
+      // Nothing will cancel it and nothing will report a turn/end for it.
+      stoppedRoomTurns.delete(exchangeId)
+      clearLiveTurn(sessionId, exchangeId)
       return
     }
+    if (stopTurn(sessionId, exchangeId, () => agent.cancel({ kind: 'hook', reason: 'ds-bot/stopped' }))) return
     for (const message of [...(agent.inbox?.nextStep ?? []), ...(agent.inbox?.nextTurn ?? [])]) {
       if (message.source?.exchangeId === exchangeId && agent.inbox.remove(message.id)) stoppedRoomTurns.delete(exchangeId)
     }
@@ -384,6 +438,7 @@ export function install(rt) {
         break
       }
       case 'turn/end': {
+        disarmStopSettle(id)
         setActivity(id, undefined)
         const info = entry.info
         const joined = entry.joined ?? []
@@ -496,5 +551,5 @@ export function install(rt) {
     }
   })
 
-  Object.assign(rt, { live, liveOf, roomWaiters, roomProgress, roomInbox, activityView, workView, roomWorkView, callDetail, stopRoomTurn })
+  Object.assign(rt, { live, liveOf, roomWaiters, roomProgress, roomInbox, activityView, workView, roomWorkView, callDetail, stopRoomTurn, stopTurn, clearLiveTurn })
 }

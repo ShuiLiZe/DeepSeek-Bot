@@ -63,6 +63,11 @@ export const ROOM_LATE_ROUNDS = 10
 // A member still at work this long after its first tool call lets the round go on; it
 // posts its reply when the work is done.
 export const ROOM_WORK_GRACE_MS = 15_000
+// A stop cancels a member's turn through DSH and waits for its turn/end to clear the
+// entry that shows the Bot as working. A Session that is gone, or a cancel that lands
+// while it tears down, reports no turn/end, so a stop still showing after this long is
+// taken as final.
+export const STOPPED_SETTLE_MS = 15_000
 
 export const OWN_CHAT_LINE_MAX = 400
 // The message an anchor points at is shown whole (up to this), so a long draft takes

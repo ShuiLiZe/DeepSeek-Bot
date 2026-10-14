@@ -600,8 +600,11 @@ export function install(rt) {
     const member = rt.botOf(botId)
     const sessionId = room?.sessions?.[botId]
     if (room === undefined || member === undefined || sessionId === undefined || rt.live.get(sessionId)?.turn === undefined) return false
-    const agent = await rt.resolveAgent(sessionId)
-    agent.cancel({ kind: 'user' })
+    const agent = await rt.resolveAgent(sessionId).catch(() => undefined)
+    // A Session that cannot be resolved will not report a turn/end for this stop, so
+    // the entry stops showing at once instead of staying up for the process's life.
+    if (agent === undefined) rt.clearLiveTurn(sessionId)
+    else rt.stopTurn(sessionId, undefined, () => agent.cancel({ kind: 'user' }))
     await postToRoom(room, member, '', { quiet: true, stopped: true })
     return true
   }

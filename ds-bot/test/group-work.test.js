@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { apply } from '../index.js'
 import { fakeContext } from './fake-ctx.js'
-import { ROOM_LATE_ROUNDS, ROOM_WORK_GRACE_MS } from '../src/host/constants.js'
+import { ROOM_LATE_ROUNDS, ROOM_WORK_GRACE_MS, STOPPED_SETTLE_MS } from '../src/host/constants.js'
 
 // Chief, the admin of group 'r1', speaks there from 'ga'; Writer from 'gb'; Tester from 'gc'.
 const seed = (room = {}) => ({
@@ -104,8 +104,16 @@ async function start(t, room) {
     const post = agentOf('r1').calls.shift()
     return { content: post.content, source: post.source }
   }
+  // A Session the host can no longer resolve, as one that went away while its turn was
+  // recorded as running.
+  const detached = new Set()
+  const detach = (sessionId) => detached.add(sessionId)
+  ctx.sessionController.resolveAgent = async (sessionId) => {
+    if (detached.has(sessionId)) throw new Error('no such session')
+    return { agent: agentOf(sessionId) }
+  }
   await tool('list_bots', {}, 'a')
-  return { home, agentOf, emit, tool, call, begin, finish, round, say, takePost }
+  return { home, agentOf, emit, tool, call, begin, finish, round, say, takePost, detach }
 }
 
 const settle = async (check) => {
@@ -286,4 +294,56 @@ test('members still at work show in the team view and in the prompts of the othe
   assert.deepEqual(value.work.rooms.r1.map(entry => [entry.botId, entry.tool, entry.speaking]), [['b', 'pwsh', undefined], ['c', undefined, true]])
   host.finish('gc', '没问题。')
   await settle(() => result() !== undefined)
+})
+
+// A stop cancels through DSH, and a cancelled turn is expected to report its own
+// turn/end. When it does not — the Session is gone, or the cancel races its teardown —
+// the entry that says the Bot is working would never be cleared, and the app would show
+// it as working for the rest of the process's life.
+test('a stopped turn that never reports turn/end stops showing as working', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const host = await start(t)
+  host.emit('gb', 'turn/start', { turn: 1 })
+  host.emit('gb', 'tool/call', { callId: 'k1', name: 'pwsh', arguments: '{}' })
+  const before = await host.call('state', {})
+  assert.deepEqual(Object.keys(before.value.work.bots), ['b'])
+
+  assert.equal((await host.call('stop-member-work', { roomId: 'r1', botId: 'b' })).value, true)
+  // The cancel is asked for, but this Session never reports a turn/end for it.
+  await settle(() => host.agentOf('gb').cancelled.length === 1)
+  const during = await host.call('state', {})
+  assert.deepEqual(Object.keys(during.value.work.bots), ['b'])
+
+  // The backstop takes the stop as final once the grace period passes.
+  t.mock.timers.tick(STOPPED_SETTLE_MS)
+  await settle(() => true)
+  const after = await host.call('state', {})
+  assert.deepEqual(Object.keys(after.value.work.bots), [])
+  assert.deepEqual(after.value.activity, {})
+
+  // A turn that starts later and ends normally still clears itself: the backstop is
+  // disarmed by the turn/end, so it cannot clear an unrelated turn behind its back.
+  host.emit('gb', 'turn/start', { turn: 2 })
+  const again = await host.call('state', {})
+  assert.deepEqual(Object.keys(again.value.work.bots), ['b'])
+  host.finish('gb', '做完了。')
+  await settle(() => true)
+  const done = await host.call('state', {})
+  assert.deepEqual(Object.keys(done.value.work.bots), [])
+})
+
+// The member's Session is gone, so nothing will cancel the turn and nothing will report
+// a turn/end for it. The stop still has to clear the entry that shows it as working.
+test('a stop whose member Session cannot be resolved clears the entry at once', async (t) => {
+  const host = await start(t)
+  host.emit('gb', 'turn/start', { turn: 1 })
+  host.emit('gb', 'tool/call', { callId: 'k1', name: 'pwsh', arguments: '{}' })
+  assert.deepEqual(Object.keys((await host.call('state', {})).value.work.bots), ['b'])
+
+  host.detach('gb')
+  assert.equal((await host.call('stop-member-work', { roomId: 'r1', botId: 'b' })).value, true)
+  await settle(() => true)
+  const after = await host.call('state', {})
+  assert.deepEqual(Object.keys(after.value.work.bots), [])
+  assert.deepEqual(after.value.activity, {})
 })
