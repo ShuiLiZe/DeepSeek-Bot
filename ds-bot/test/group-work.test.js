@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { apply } from '../index.js'
 import { fakeContext } from './fake-ctx.js'
-import { ROOM_LATE_ROUNDS, ROOM_STEP_GAP_MS, ROOM_WORK_GRACE_MS, STOPPED_SETTLE_MS } from '../src/host/constants.js'
+import { LOG_WRITE_FAILURES_MAX, ROOM_LATE_ROUNDS, ROOM_STEP_GAP_MS, ROOM_WORK_GRACE_MS, STOPPED_SETTLE_MS } from '../src/host/constants.js'
 
 // Chief, the admin of group 'r1', speaks there from 'ga'; Writer from 'gb'; Tester from 'gc'.
 const seed = (room = {}) => ({
@@ -29,6 +29,8 @@ async function start(t, room) {
   const home = mkdtempSync(join(tmpdir(), 'ds-bot-work-'))
   writeFileSync(join(home, 'state.json'), JSON.stringify(seed(room)))
   const ctx = fakeContext()
+  let flushError
+  let pickWarn
   const agents = new Map()
   const agentOf = (sessionId) => {
     if (!agents.has(sessionId)) {
@@ -55,11 +57,14 @@ async function start(t, room) {
     workspaceRegistry: { get: () => undefined, resolveByPath: async () => undefined, create: async path => ({ id: 'w1', path }), archiveSession: async () => {} },
     sessionController: { create: async () => ({ sessionId: 's1' }), resolveAgent: async sessionId => ({ agent: agentOf(sessionId) }), selectModel: async () => {} },
     sessionTitle: { rename: async () => {} },
-    sessions: { flush: async () => {} },
+    sessions: { flush: async () => { if (flushError !== undefined) throw flushError } },
   })
   let route
   const register = ctx.connection.fetch.register
   ctx.connection.fetch.register = (options) => { route = options; return register(options) }
+  // rt.warn reaches the host through the logger, which is where a test can watch it.
+  const logged = []
+  ctx.logger.warn = (template, ...args) => { pickWarn?.(template, ...args); if (pickWarn === undefined) logged.push([template, ...args]) }
   apply(ctx, { home })
   t.after(async () => {
     await ctx.dispose()
@@ -113,7 +118,7 @@ async function start(t, room) {
     if (detached.has(sessionId)) throw new Error('no such session')
     return { agent: agentOf(sessionId) }
   }
-  return { home, agentOf, emit, tool, call, begin, finish, round, say, takePost, detach }
+  return { home, agentOf, emit, tool, call, begin, finish, round, say, takePost, detach, failFlush: error => { flushError = error }, watchWarnings: into => { pickWarn = (...args) => into.push(args) } }
 }
 
 const settle = async (check) => {
@@ -541,4 +546,28 @@ test('a stop whose member Session cannot be resolved clears the entry at once', 
   const after = await host.call('state', {})
   assert.deepEqual(Object.keys(after.value.work.bots), [])
   assert.deepEqual(after.value.activity, {})
+})
+
+// A Session whose log the codec refuses to append to fails on every delivery. The group
+// has to go on, and the same failure must not be reported without end.
+test('a Session that cannot be written to fails its deliveries once, and the group goes on', async (t) => {
+  const host = await start(t)
+  const warnings = []
+  const failure = Object.assign(new Error('format v4 tool/result at seq 62 requires toolCallId matching its tool source'), { name: 'SessionFormatError' })
+  host.failFlush(failure)
+  host.watchWarnings(warnings)
+
+  const reported = () => warnings.filter(args => String(args[1] ?? '').includes('cannot be written to any more'))
+  // The round reaches its member, the delivery fails, and the round still resolves.
+  const first = host.round('c1', host.say('@Writer 写一段'))
+  await settle(() => reported().length === 1)
+  await settle(() => first() !== undefined)
+  assert.deepEqual(host.agentOf('gb').calls.length, 1)
+
+  // Further rounds keep failing, and the failure is reported only up to the cap.
+  for (let index = 0; index < 5; index += 1) {
+    const next = host.round(`c${index + 2}`, host.say('@Writer 再写一段'))
+    await settle(() => next() !== undefined)
+  }
+  assert.equal(reported().length, LOG_WRITE_FAILURES_MAX)
 })

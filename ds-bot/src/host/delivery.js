@@ -1,10 +1,15 @@
 // Delivery: how one Bot, the user, or DS Bot itself puts a message into a Bot Session.
 import { randomUUID } from 'node:crypto'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { SOURCE_KIND } from './constants.js'
+import { LOG_WRITE_FAILURES_MAX, LOG_WRITE_FAILURE_MARK, SOURCE_KIND } from './constants.js'
 
 export function install(rt) {
   const { ctx, state } = rt
+
+  // Sessions whose log the codec refuses to append to. A rejected event rolls the append
+  // cursor back, so every later delivery fails the same way; the count bounds how often
+  // that is reported and stops the retries once the log is clearly unrepairable here.
+  const logWriteFailures = new Map()
 
   const resolveAgent = async (sessionId) => {
     const resolved = await ctx.sessionController.resolveAgent(sessionId)
@@ -78,8 +83,29 @@ export function install(rt) {
     })
     if (steer) agent.steer(message)
     else agent.followup(message)
-    await ctx.sessions.flush(agent.session)
+    try {
+      await ctx.sessions.flush(agent.session)
+      logWriteFailures.delete(targetSessionId)
+    } catch (error) {
+      // A Session-format rejection is not transient: the append cursor stays where it
+      // was, so the next delivery fails identically. Report it at most a few times and
+      // then leave the Session alone instead of retrying it forever.
+      if (!isLogWriteFailure(error)) throw error
+      const failures = (logWriteFailures.get(targetSessionId) ?? 0) + 1
+      logWriteFailures.set(targetSessionId, failures)
+      if (failures <= LOG_WRITE_FAILURES_MAX) {
+        rt.warn('ds-bot: Session %s cannot be written to any more (%s); later messages to it are dropped until its log is repaired', targetSessionId, error.message)
+      }
+      throw error
+    }
     return exchangeId
+  }
+
+  // The codec rejects an event and rolls back, which is what makes the failure permanent.
+  // A transient I/O error carries a different name and must still propagate untouched.
+  const isLogWriteFailure = (error) => {
+    if (error?.name !== LOG_WRITE_FAILURE_MARK && !String(error?.message ?? '').includes(LOG_WRITE_FAILURE_MARK)) return false
+    return /tool\/result|toolCallId|format v\d/.test(String(error?.message ?? ''))
   }
 
   Object.assign(rt, { resolveAgent, deliver })
