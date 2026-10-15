@@ -602,6 +602,8 @@ export function BotReturn({ wide, useSurface, actions }) {
 }
 
 // Agent mode has none of the shell-group styles, so the return button carries its own.
+// The surface veil lives here too: the swap it covers is the one that withdraws
+// SHELL_CSS, so a veil styled from that sheet loses its rules before it is ever seen.
 export const RETURN_CSS = `
 .bt-return{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:0;border-radius:999px;background:none;color:inherit;font:inherit;font-size:14px;line-height:20px;cursor:pointer;transition:background-color .12s ease}
 .bt-return:hover{background:rgba(127,127,127,.14)}
@@ -611,6 +613,14 @@ export const RETURN_CSS = `
 /* Shell styles carry --bt-ink-deepseek and Agent mode withdraws them; pin it here. */
 .bt-return .bt-mark{--bt-ink-deepseek:#4D6BFE}
 .bt-return-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Covers the shell across a surface swap so Agent mode and Bot mode cross-fade
+   instead of snapping. It paints the destination background rather than the old
+   one, so the new skin fades in from a flat colour of its own tone. */
+.bt-surface-veil{position:fixed;inset:0;z-index:9999;pointer-events:none;background:var(--bt-main,#fcfcfc);animation:bt-fade-in .12s ease-out both}
+.bt-surface-veil-out{animation:bt-fade-out .2s ease-out both}
+@keyframes bt-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes bt-fade-out{from{opacity:1}to{opacity:0}}
+@media (prefers-reduced-motion:reduce){.bt-surface-veil,.bt-surface-veil-out{animation-duration:.01s}}
 `
 
 export function BrandMark({ size = 24 }) {

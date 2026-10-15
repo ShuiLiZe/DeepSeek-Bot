@@ -2395,8 +2395,14 @@ ${SKIN_FOOT}>div:has(> [data-slot="sidebar.settings"]){order:-1!important;flex:n
 .bt-bubble a[href^="${MENTION_ORIGIN}"] svg{display:none}
 /* The account seat carries the same whale as the brand mark, so it takes the
    accent colour rather than the muted ink: a grey whale reads as a disabled
-   control next to the bright one in the sidebar head. */
+   control next to the bright one in the sidebar head. The whale paints from an
+   explicit fill, so the ink variable is what recolours it; the color property
+   reaches only the seat's own text. */
 .bt-you{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bt-accent) 10%,var(--bt-sidebar));color:var(--bt-accent);box-shadow:inset 0 0 0 1px var(--bt-line);transition:background-color .12s ease}
+/* Agent mode withdraws SHELL_CSS, and with it the ink variables the whale reads;
+   an unresolved var() falls back to black. The pin gives the seat its colour in
+   every mode, the same way RETURN_CSS pins the return button's whale. */
+.bt-you .bt-mark{--bt-ink-deepseek:var(--bt-accent,#4D6BFE)}
 button:hover .bt-you{background:color-mix(in srgb,var(--bt-accent) 18%,var(--bt-sidebar))}
 .bt-you-wrap{display:inline-flex;padding:0}
 .bt-connect-foot{width:100%;height:36px}
@@ -2697,12 +2703,6 @@ header[class*="_header"] .bt-head{flex:1 1 auto;width:100%}
 }
 @keyframes bt-fade-in{from{opacity:0}to{opacity:1}}
 @keyframes bt-fade-out{from{opacity:1}to{opacity:0}}
-/* Covers the shell across a surface swap so Agent mode and Bot mode cross-fade
-   instead of snapping. It paints the destination background rather than the old
-   one, so the new skin fades in from a flat colour of its own tone. */
-.bt-surface-veil{position:fixed;inset:0;z-index:9999;pointer-events:none;background:var(--bt-main);animation:bt-fade-in .12s ease-out both}
-.bt-surface-veil-out{animation:bt-fade-out .2s ease-out both}
-@media (prefers-reduced-motion:reduce){.bt-surface-veil,.bt-surface-veil-out{animation-duration:.01s}}
 [data-composer-card]{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;gap:0!important;min-height:44px!important;border-radius:22px!important;padding:7.5px!important;box-sizing:border-box;background:var(--bt-main)!important;border:.5px solid var(--bt-line-2)!important;box-shadow:0 2px 8px -1px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.03),0 0 0 1px rgba(228,228,228,.04)!important;transition:border-color .15s ease,background-color .15s ease,${spring(SPRING_SHAPE, "border-radius")}!important}
 [data-composer-card]:hover,[data-composer-card]:focus-within{border-color:color-mix(in srgb,var(--bt-ink) 30%,transparent)!important}
 [data-composer-card]:has(> [data-slot="conversation.input.attachments"] *),[data-composer-card]:has([data-composer-input] br + *),[data-composer-card]:has([data-composer-input] > :nth-child(2)){border-radius:18px!important}
@@ -2823,16 +2823,17 @@ div:has(> nav [class*="_marks"]){display:none!important}
     width: min(72vw, 276px) !important;
     max-width: 280px !important;
   }
-  /* The drawer scrolls, so its scrollbar rides the drawer's right edge while the
-     rows stop 12px short of it and leave a strip of bare track. Give the scroll
-     element the same right inset the rows use, so the bar sits on the content
-     edge the user reads as the list's border. */
-  .dshm-drawer[data-open=true] > * {
-    scrollbar-width: thin !important;
-    padding-right: 12px !important;
-  }
-  .dshm-drawer[data-open=true] .bt-side {
+  /* The list, not the drawer or the panel, is what scrolls: the bar belongs on
+     the content edge the rows read as the list's border. Give the inset to the
+     scroll element itself and let the panel sit flush, so bar and rows share one
+     edge instead of the bar riding the panel's own padding. */
+  .bt-side {
     padding-right: 0 !important;
+  }
+  .bt-list {
+    scrollbar-width: thin !important;
+    scrollbar-gutter: stable !important;
+    padding-right: 12px !important;
   }
 
   /* 2. 右侧会话详情抽屉适度收拢与背景半透明遮罩 */
@@ -6045,6 +6046,14 @@ var RETURN_CSS = `
 /* Shell styles carry --bt-ink-deepseek and Agent mode withdraws them; pin it here. */
 .bt-return .bt-mark{--bt-ink-deepseek:#4D6BFE}
 .bt-return-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Covers the shell across a surface swap so Agent mode and Bot mode cross-fade
+   instead of snapping. It paints the destination background rather than the old
+   one, so the new skin fades in from a flat colour of its own tone. */
+.bt-surface-veil{position:fixed;inset:0;z-index:9999;pointer-events:none;background:var(--bt-main,#fcfcfc);animation:bt-fade-in .12s ease-out both}
+.bt-surface-veil-out{animation:bt-fade-out .2s ease-out both}
+@keyframes bt-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes bt-fade-out{from{opacity:1}to{opacity:0}}
+@media (prefers-reduced-motion:reduce){.bt-surface-veil,.bt-surface-veil-out{animation-duration:.01s}}
 `;
 function BrandMark({ size = 24 }) {
   return (0, import_react8.createElement)("span", { className: "bt-brand-whale" }, (0, import_react8.createElement)(BotMark, { look: MAIN_LOOK, size }));
@@ -14518,15 +14527,14 @@ function apply(ctx) {
       }
       writeMode(mode);
       const veil = document.body.appendChild(Object.assign(document.createElement("div"), { className: "bt-surface-veil" }));
-      const swap = () => {
-        surface.set((state) => ({ ...state, mode }));
-        if (mode === "bot") home();
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          veil.classList.add("bt-surface-veil-out");
-          veil.addEventListener("animationend", () => veil.remove(), { once: true });
-        }));
-      };
-      requestAnimationFrame(swap);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        veil.classList.add("bt-surface-veil-out");
+        const gone = () => veil.remove();
+        veil.addEventListener("animationend", gone, { once: true });
+        setTimeout(gone, 400);
+      }));
+      surface.set((state) => ({ ...state, mode }));
+      if (mode === "bot") home();
     },
     markUnread: (id) => setUnread(id, true),
     beginVisit: (id) => {

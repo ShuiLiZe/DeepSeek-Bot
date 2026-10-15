@@ -479,19 +479,20 @@ export function apply(ctx) {
       // interface snaps from one skin to the other. A veil painted over the shell
       // before the swap and faded out after it turns that snap into a crossfade; it
       // is the only handle we have, since a group install returns disposers, not a
-      // root element to animate.
+      // root element to animate. Its styles live in RETURN_CSS, which no surface
+      // change withdraws: the veil covers the very swap that takes SHELL_CSS away.
       const veil = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'bt-surface-veil' }))
-      const swap = () => {
-        surface.set(state => ({ ...state, mode }))
-        if (mode === 'bot') home()
-        // Two frames: one for the mounted groups to paint, one to start the fade
-        // against the finished interface instead of an empty shell.
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          veil.classList.add('bt-surface-veil-out')
-          veil.addEventListener('animationend', () => veil.remove(), { once: true })
-        }))
-      }
-      requestAnimationFrame(swap)
+      // A frame for the veil to paint, so the snap is never the frame the user sees.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        veil.classList.add('bt-surface-veil-out')
+        const gone = () => veil.remove()
+        // animationend is the clean exit; the timer covers a dropped animation,
+        // which would otherwise leave the veil on top of the interface for good.
+        veil.addEventListener('animationend', gone, { once: true })
+        setTimeout(gone, 400)
+      }))
+      surface.set(state => ({ ...state, mode }))
+      if (mode === 'bot') home()
     },
     markUnread: id => setUnread(id, true),
     beginVisit: (id) => {
