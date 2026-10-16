@@ -994,8 +994,15 @@ div:has(> nav [class*="_marks"]){display:none!important}
 /* Phone layout. dsh-mobile switches its own shell to the drawer layout at
    max-width:899px, so the breakpoint must match it: below 900px the drawer is
    already showing, and rules keyed to a narrower query would leave parts of the
-   panel in their desktop shape. 899.98px is the sub-pixel-safe form of "<= 899". */
-@media (max-width: 899.98px), (pointer: coarse) {
+   panel in their desktop shape. 899.98px is the sub-pixel-safe form of "<= 899".
+
+   The pointer clause needs (hover: none) as well. (pointer: coarse) alone is
+   true on a laptop with a touchpad, so it put the phone layout on a desktop
+   window: Chromium treats a touchpad as a coarse pointer even though the device
+   still hovers with a mouse. A real phone or tablet has no hover, so requiring
+   both keeps them matched while leaving a wide desktop window in its desktop
+   shape. */
+@media (max-width: 899.98px), ((pointer: coarse) and (hover: none)) {
   /* 1. 左侧边栏抽屉紧凑收拢，避免空旷笨重 */
   .dshm-drawer[data-open=true],
   [data-pane="sidebar"][data-open=true],
