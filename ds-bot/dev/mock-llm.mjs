@@ -17,8 +17,9 @@
 //
 // Commands to a Bot:
 //   建群 名: A, B · 群发[回报] 名: 消息 · 改群 名 公告|管理员|模式|加|踢: 值 · 删群 名
-//   看群 名 (read_group_chat) · 转告 名: 消息 (message_bot) · 搜索：查询1 | 查询2 (web_search)
+//   看群 名 (read_group_chat) · 转告 名: 消息, also over several lines (message_bot) · 搜索：查询1 | 查询2 (web_search)
 //   插话 名: 消息 (message_bot when "now") · 排队 名: 消息 (message_bot when "queue") · 叫停 名: 原因 (stop_bot)
+//   In a message from a Bot: 转告 名: 消息 (hands it on with message_bot) · 慢慢做 N (answers after N seconds)
 //   长文 N / long N (N×1000 characters) · 长任务 N [K] (N steps of K×1000, default 4)
 //   查记录 词 [词…] · 查锚点 part N #序号 · 查第 N 段 (read_own_chat)
 //   上下文里有 词 (searches the context except the last message) · 撑爆 (fake overflow, 400)
@@ -26,6 +27,8 @@
 //   卡片 K (K×1000 characters, then a question card) · 笔记模式 截断一次|缺节一次|总截断|总缺节|失败|正常
 //   记住[@话题] 事实 · 团队记住 事实 (remember) · 忘掉 事实 (forget) · 回忆 [词] (recall)
 //   查能力 [词] (names the mcp__ tools and catalog skills that contain 词; also in a group)
+//   A message with a file (a long Bot message as a file, a file the user sent): the Bot
+//   reads the saved path, then says how many lines it read and how the file ends.
 // Memory panel: a summary restating the entries; asks 记住|remember X, 团队记住 X,
 //   删掉|remove N, 改|edit N: X change entries, anything else gets the entry count.
 // Commands in a group:
@@ -34,6 +37,7 @@
 //   提权 (members other than the admin run a shell command that asks for full access)
 //   写成文字 (members write their tool call as text instead of making it; also in a Bot's own chat)
 //   派活 N (the admin hands the first other member N seconds of work; the admin answers its result)
+//   分步 N (like 派活, but the member says a line at each of its three steps, N seconds apart)
 // A handoff turn answers "第 N 段接着做完了". Handoff notes and backend compaction each
 // return a full eight-section note marked "handoff 提示词" or "backend 提示词" (a Bot's
 // Session should only see the former; retries add "重试", merges add "合并了上一份笔记").
@@ -84,6 +88,8 @@ const tool = (name, input) => ({
 const think = value => ({ type: 'thinking', thinking: value })
 const ESCALATION = '提权测试：用户在群里要求'
 const HANDED_WORK = '群里派的活'
+const STEPPED_WORK = '群里分步的活'
+const STEP_LINES = ['目录看完了，一共 12 个文件，开始整理。', '整理好一半了，剩下的是索引。']
 const WRITTEN_CALL = '我先看一下目录。\n<tool_call>\n<function=pwsh>\n<parameter=command>\nGet-ChildItem\n</parameter>\n</function>\n</tool_call>'
 // Deterministic filler that grows a conversation by about `chars` characters.
 const filler = (chars, tag) => Array.from({ length: Math.ceil(chars / 20) }, (_, index) => `${tag}第${index + 1}段：这是一段用来撑长上下文的测试文字。`).join('').slice(0, chars)
@@ -206,6 +212,12 @@ function decide(body) {
     if (used?.input?.justification === ESCALATION) return [text(result.is_error ? `没跑成：${resultText.slice(0, 80)}` : '命令跑完了，文件已经写好。')]
     const job = new RegExp(`^${HANDED_WORK}-(\\d+)-`).exec(used?.input?.pattern ?? '')
     if (job) return Object.assign([text(`干完了，用了 ${job[1]} 秒。`)], { delay: Number(job[1]) * 1000 })
+    const stepped = new RegExp(`^${STEPPED_WORK}-(\\d+)-(\\d+)-`).exec(used?.input?.pattern ?? '')
+    if (stepped) {
+      const [at, wait] = [Number(stepped[1]), Number(stepped[2]) * 1000]
+      if (at > STEP_LINES.length) return Object.assign([text('分步干完了：目录、正文、索引都整理好了。')], { delay: wait })
+      return Object.assign([text(STEP_LINES[at - 1]), tool(used.name, { pattern: `${STEPPED_WORK}-${at + 1}-${stepped[2]}-*` })], { delay: wait })
+    }
     switch (used?.name) {
       case 'group_relay': return [text('')]
       case 'create_bot': {
@@ -238,6 +250,10 @@ function decide(body) {
         return [text(`我私聊里聊过 ${hits.length} 条${loose}：${hits.at(-1)?.slice(0, 120) ?? ''}${across}`)]
       }
       case 'read_group_chat': return [text(`群里最近：\n${resultText}`)]
+      case 'read': {
+        const content = resultText.replace(/<[^>]+>/g, '').replace(/^\s*\d+[\t→|:]/gm, '').trim()
+        return [text(result.is_error ? `附件没读成：${resultText.slice(0, 200)}` : `读了附件（${content.length} 字），结尾是「${content.slice(-24)}」。`)]
+      }
       case 'remember':
       case 'forget':
         return [text(/^(Saved to|Updated in|Removed from) /.test(resultText) ? (used.name === 'remember' ? '记下了。' : '已经忘掉了。') : `没记成：${resultText}`)]
@@ -255,6 +271,10 @@ function decide(body) {
   const userText = textOf(last?.content).trim()
   // "撑爆": the provider rejects the request as past its window.
   if (userText.startsWith('撑爆')) return 'overflow'
+  // A file in the message (a long Bot message, a file the user sent): DSH gives its saved
+  // path, and the Bot reads it first.
+  const saved = /verbatim read-only copy saved at ("(?:[^"\\]|\\.)*")/.exec(userText)
+  if (saved) return [tool('read', { file_path: JSON.parse(saved[1]) })]
   // "长任务" keeps stepping when a Bot message splices into its turn (a relayed
   // note); only a fresh opener or "[Stopped by" ends it. A spliced "[Message
   // from X]" is taken into account there; it is answered in a turn of its own.
@@ -350,6 +370,10 @@ function decide(body) {
     const lookup = ['glob', 'grep', 'read'].find(name => tools.has(name))
     if ((ask = /派活\s*(\d+)/.exec(userLine)) && leads && peer) return [text(`@${peer} 干活 ${ask[1]}`)]
     if (handed?.[1] === me && mentioner && lookup) return [tool(lookup, { pattern: `${HANDED_WORK}-${handed[2]}-*` })]
+    const steps = /^\S+: @(\S+) 分步干活 (\d+)/m.exec(block)
+    if ((ask = /分步\s*(\d+)/.exec(userLine)) && leads && peer) return [text(`@${peer} 分步干活 ${ask[1]}`)]
+    if (steps?.[1] === me && mentioner && lookup) return [text('收到，我先看看目录。'), tool(lookup, { pattern: `${STEPPED_WORK}-1-${steps[2]}-*` })]
+    if (/分步干完了/.test(block) && leads) return [text('收到，辛苦了。')]
     if (/^\S+: 干完了/.test(userLine) && leads) return [text('收到，辛苦了。')]
     // Ping-pong: whoever is mentioned mentions back, to exercise the per-member cap.
     if (/来回/.test(userLine)) return [text(mentioner ? `@${mentioner} 回你` : leads && peer ? `@${peer} 来回` : '[PASS]')]
@@ -378,7 +402,7 @@ function decide(body) {
     return [tool('update_group', { group: order[1], ...field })]
   }
   if ((order = /^删群\s*(\S+)$/.exec(userText))) return [tool('delete_group', { group: order[1] })]
-  if ((order = /^转告\s*(\S+?)\s*[:：]\s*(.+)$/.exec(userText))) return [tool('message_bot', { to: order[1], message: order[2] })]
+  if ((order = /^转告\s*(\S+?)\s*[:：]\s*([\s\S]+)$/.exec(userText))) return [tool('message_bot', { to: order[1], message: order[2] })]
   if ((order = /^插话\s*(\S+?)\s*[:：]\s*(.+)$/.exec(userText))) return [tool('message_bot', { to: order[1], message: order[2], when: 'now' })]
   if ((order = /^排队\s*(\S+?)\s*[:：]\s*(.+)$/.exec(userText))) return [tool('message_bot', { to: order[1], message: order[2], when: 'queue' })]
   if ((order = /^叫停\s*(\S+?)\s*[:：]\s*(.+)$/.exec(userText))) return [tool('stop_bot', { bot: order[1], reason: order[2] })]
@@ -408,11 +432,18 @@ function decide(body) {
     const asked = userText.split('\n').slice(1).join(' ').trim().replace(/[。.!！?？]+$/u, '')
     return [text(`${match[1]} 转来一句话：「${asked}」。我先说打算：把手头已有的材料理一遍，列出还缺什么，再和你确认先后顺序；你确认之前我不会动手。`)]
   }
+  if ((match = /^\[Message from ([^\]·]+?)(?: · [^\]]*)?\]\n(?:转告\s*(\S+?)\s*[:：]\s*([\s\S]+)|慢慢做\s*(\d+))/.exec(userText))) {
+    if (match[2] && tools.has('message_bot')) return [tool('message_bot', { to: match[2], message: match[3].trim() })]
+    if (match[4]) return Object.assign([text(`给 ${match[1]} 的回复：做完了，用了 ${match[4]} 秒。`)], { delay: Number(match[4]) * 1000 })
+  }
   if ((match = /^\[Message from ([^\]·]+?)(?: · [^\]]*)?\]/.exec(userText))) {
     return [text(`给 ${match[1]} 的回复：\n- 先做：把现有材料理一遍\n- 需要用户提供：目标和截止时间（尚未聊过）\n- 节奏：确认后每天同步一次`)]
   }
   if ((match = /^\[Reply from ([^\]]+)\]\n.* could not answer your message: its model call failed \(([^)]+)\)/.exec(userText))) {
     return [text(`${match[1]} 这次没能回答：它的模型调用出错了（${match[2]}）。可能是 API 密钥失效，请检查它用的模型设置。`)]
+  }
+  if ((match = /^\[Reply from ([^\]·]+?) · for the work ([^\]]+?) asked you for/.exec(userText))) {
+    return [text(`${match[1]} 交回了，我把结果交给 ${match[2]}。`)]
   }
   if ((match = /^\[Reply from ([^\]]+)\]/.exec(userText))) {
     return [text(`${match[1]} 回话了：目标和截止时间都还没和你聊过，它没法凭空开工。`), tool('ask_user', { question: '下一步怎么走？', detail: '没有目标之前它只能空转。', options: ['现在告诉我目标', '先去跟它聊', '先搁着'] })]
@@ -541,6 +572,7 @@ function sse(res, payload) {
 // An Ollama-shaped search API, for checking a `searchApis` entry declared in config.
 function searchApi(req, res) {
   let raw = ''
+  req.setEncoding('utf8')
   req.on('data', chunk => { raw += chunk })
   req.on('end', () => {
     const body = JSON.parse(raw || '{}')
@@ -558,6 +590,7 @@ const server = createServer((req, res) => {
     return
   }
   let raw = ''
+  req.setEncoding('utf8')
   req.on('data', chunk => { raw += chunk })
   req.on('end', () => {
     const body = JSON.parse(raw)

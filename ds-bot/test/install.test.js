@@ -34,6 +34,7 @@ test('apply registers listeners, tools, and effects in a fixed order', (t) => {
   t.after(stop)
   assert.equal(applyResult, undefined)
   assert.deepEqual(ctx.calls, [
+    'effect ds-bot: diagnostics log',
     'effect ds-bot: state lock',
     'on llm/adapters-updated',
     'on session/event',
@@ -55,6 +56,7 @@ test('apply registers listeners, tools, and effects in a fixed order', (t) => {
     'tool ask_user',
     'tools guard',
     'on agent/created',
+    'on session/event',
     'tool list_capabilities',
     'tool save_capability',
     'tool delete_capability',
@@ -64,6 +66,7 @@ test('apply registers listeners, tools, and effects in a fixed order', (t) => {
     'tool group_relay',
     'tool read_own_chat',
     'tool read_group_chat',
+    'effect ds-bot: group step lines',
     'on llm/stream',
     'on approval/request (prepend)',
     'on agent/inbox/discarded',
@@ -79,6 +82,7 @@ test('apply registers listeners, tools, and effects in a fixed order', (t) => {
     'effect ds-bot: Bot compaction',
     'on agent/created',
     'on agent/pre-step (prepend)',
+    'on system-prompt/assemble (prepend)',
     'on agent/request-error (prepend)',
     'on agent/request-error (prepend)',
     'on agent/status',
