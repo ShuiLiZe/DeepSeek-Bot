@@ -9,6 +9,10 @@
 
 English | [中文](README.zh.md)
 
+> **Installing this fork (ShuiLiZe)**: in DSH, go to **Plugins → Add plugin** and enter
+> `github:ShuiLiZe/DeepSeek-Bot#main&path:/ds-bot` (needs Git), then **Install** and **Enable**, and fully restart DSH.
+> The `ds-bot` package and `github:Fei2411/...` addresses in the Install section below install upstream instead. This fork publishes no releases, so the in-app updater won't offer updates; reinstall the address above to update.
+
 ![version](https://img.shields.io/badge/version-v0.1_preview-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.0--rc.2-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
 
 DeepSeek Bot (DS Bot) is a bot plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH). It turns DSH into bots. You create your own bots, then talk and work with them.
