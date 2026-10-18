@@ -2,7 +2,7 @@
 // triggered, the waiters and inboxes of group rounds, and routing a finished turn's reply.
 //
 // Turn tracking: which turns were triggered by another Bot, and what they said.
-import { HANDOFF_ACK, MESSAGE_INLINE_MAX, REFERENCE_KIND, REPLY_KIND, SOURCE_KIND } from './constants.js'
+import { HANDOFF_ACK, MESSAGE_INLINE_MAX, REFERENCE_KIND, REPLY_KIND, SOURCE_KIND, STOPPED_SETTLE_MS } from './constants.js'
 import { absoluteLinks } from './links.js'
 import { textOf } from './text.js'
 import { reminderText } from './schedules.js'
@@ -87,16 +87,64 @@ export function install(rt) {
   // delivery still waiting for the member's Session. An earlier turn there keeps going.
   // An exchange whose turn already ended stays in the set, so it is bounded.
   const STOPPED_KEPT = 200
+  // A stop asks the Session to cancel, and normally a `turn/end` event follows and clears
+  // the entry. A Session on its way out can swallow that event, which would leave the Bot
+  // shown as working forever: the roster keeps sending the same work view. Clearing the
+  // entry here is what a missing `turn/end` would have done.
+  const stopSettleTimers = new Map()
+  function clearLiveTurn(sessionId, exchangeId) {
+    const entry = live.get(sessionId)
+    if (entry?.turn === undefined) return
+    if (exchangeId !== undefined && entry.info?.exchangeId !== exchangeId) return
+    setActivity(sessionId, undefined)
+    entry.turn = undefined
+    entry.info = undefined
+    entry.texts = []
+    entry.shown = 0
+    entry.step = undefined
+    entry.switched = false
+    entry.joined = []
+    entry.later = []
+    entry.since = undefined
+    entry.tool = undefined
+    entry.calls = undefined
+    entry.lastText = undefined
+    entry.lastCalled = undefined
+  }
+  function disarmStopSettle(sessionId) {
+    const timer = stopSettleTimers.get(sessionId)
+    if (timer === undefined) return
+    clearTimeout(timer)
+    stopSettleTimers.delete(sessionId)
+  }
+  function armStopSettle(sessionId, exchangeId) {
+    disarmStopSettle(sessionId)
+    const timer = setTimeout(() => {
+      stopSettleTimers.delete(sessionId)
+      clearLiveTurn(sessionId, exchangeId)
+    }, STOPPED_SETTLE_MS)
+    timer.unref?.()
+    stopSettleTimers.set(sessionId, timer)
+  }
+  // Stops the turn a Session is running now. Returns whether there was one to stop.
+  function stopTurn(sessionId, exchangeId, cancel) {
+    const entry = live.get(sessionId)
+    if (entry?.turn === undefined) return false
+    if (exchangeId !== undefined && entry.info?.exchangeId !== exchangeId) return false
+    cancel()
+    armStopSettle(sessionId, exchangeId)
+    return true
+  }
   async function stopRoomTurn(sessionId, exchangeId) {
     stoppedRoomTurns.add(exchangeId)
     if (stoppedRoomTurns.size > STOPPED_KEPT) stoppedRoomTurns.delete(stoppedRoomTurns.values().next().value)
     const agent = await rt.resolveAgent(sessionId).catch(() => undefined)
-    if (agent === undefined) return
-    const entry = live.get(sessionId)
-    if (entry?.turn !== undefined && entry.info?.exchangeId === exchangeId) {
-      agent.cancel({ kind: 'hook', reason: 'ds-bot/stopped' })
+    if (agent === undefined) {
+      stoppedRoomTurns.delete(exchangeId)
+      clearLiveTurn(sessionId, exchangeId)
       return
     }
+    if (stopTurn(sessionId, exchangeId, () => agent.cancel({ kind: 'hook', reason: 'ds-bot/stopped' }))) return
     for (const message of [...(agent.inbox?.nextStep ?? []), ...(agent.inbox?.nextTurn ?? [])]) {
       if (message.source?.exchangeId === exchangeId && agent.inbox.remove(message.id)) stoppedRoomTurns.delete(exchangeId)
     }
@@ -507,6 +555,7 @@ export function install(rt) {
         break
       }
       case 'turn/end': {
+        disarmStopSettle(id)
         setActivity(id, undefined)
         const info = entry.info
         const joined = entry.joined ?? []
@@ -635,5 +684,5 @@ export function install(rt) {
     }
   })
 
-  Object.assign(rt, { live, liveOf, roomWaiters, roomProgress, roomInbox, activityView, workView, roomWorkView, turnsView, callDetail, doingOf, stopRoomTurn, releaseBot })
+  Object.assign(rt, { live, liveOf, roomWaiters, roomProgress, roomInbox, activityView, workView, roomWorkView, turnsView, callDetail, doingOf, stopRoomTurn, stopTurn, clearLiveTurn, releaseBot })
 }

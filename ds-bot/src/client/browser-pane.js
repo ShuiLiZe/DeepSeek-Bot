@@ -3,7 +3,7 @@
 // browser tab is a tab of its own. Browser pages are Electron webviews kept in a
 // body-level layer by bot-browsers.js; the panel draws the strip and the toolbar
 // and reports the rectangle the shown webview covers.
-import { createElement as h, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createElement as h, Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { BotMark } from './mark.js'
 import { STORAGE } from './storage.js'
@@ -467,13 +467,37 @@ export function BotPanel({ pane, leaving, roster, actions, useSessions, useSessi
     for (const name of ends) grip.addEventListener(name, onEnd)
   }
 
+  const touchStartRef = useRef(null)
+  const onPanelTouchStart = (event) => {
+    if (event.touches.length === 1) {
+      touchStartRef.current = { x: event.touches[0].clientX, y: event.touches[0].clientY }
+    }
+  }
+  const onPanelTouchEnd = (event) => {
+    const start = touchStartRef.current
+    touchStartRef.current = null
+    if (!start || event.changedTouches.length === 0) return
+    const dx = event.changedTouches[0].clientX - start.x
+    const dy = event.changedTouches[0].clientY - start.y
+    if (dx > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) panelActions.closeOverlay()
+  }
+
   const hasStrip = canBrowse && tabState.ids.length > 0
-  return h('aside', {
-    ref: root, className: 'bt-panel', 'data-view': view, 'aria-label': view === 'browser' && bot ? t("{name}'s browser", { name: bot.name }) : t('Conversation details'),
-    'data-leaving': leaving || undefined, 'aria-hidden': leaving || undefined, 'data-settling': settling || undefined,
-    'data-instant': instant || undefined, 'data-dragging': dragging || undefined, style: { '--bt-panel-w': `${panelWidth}px` },
-    onAnimationEnd: (event) => { if (event.target === event.currentTarget) setLanded(true) },
-  },
+  return h(Fragment, null,
+    leaving ? null : h('div', {
+      className: 'bt-panel-backdrop',
+      'aria-hidden': true,
+      onClick: () => panelActions.closeOverlay(),
+      onTouchStart: (event) => { event.stopPropagation(); panelActions.closeOverlay() },
+    }),
+    h('aside', {
+      ref: root, className: 'bt-panel', 'data-view': view, 'aria-label': view === 'browser' && bot ? t("{name}'s browser", { name: bot.name }) : t('Conversation details'),
+      'data-leaving': leaving || undefined, 'aria-hidden': leaving || undefined, 'data-settling': settling || undefined,
+      'data-instant': instant || undefined, 'data-dragging': dragging || undefined, style: { '--bt-panel-w': `${panelWidth}px` },
+      onAnimationEnd: (event) => { if (event.target === event.currentTarget) setLanded(true) },
+      onTouchStart: onPanelTouchStart,
+      onTouchEnd: onPanelTouchEnd,
+    },
     leaving ? null : h('div', { className: 'bt-panel-grip', role: 'separator', 'aria-orientation': 'vertical', 'aria-label': t('Resize panel'), onPointerDown: startResize }),
     // Over the whole window while dragging: the cursor stays a resize cursor and the
     // pages underneath (the chat, the guest) see no pointer.
@@ -485,10 +509,11 @@ export function BotPanel({ pane, leaving, roster, actions, useSessions, useSessi
           h(DetailsDrawer, {
             sessionId: pane.id, startRenaming: pane.renaming, startTab: pane.tab, hasStrip,
             roster, actions: panelActions, useSessions, useSessionStatus, useActivity, useWork, useBrowserTabs, useBrowserPages,
-          })))
+          }))))
 }
 
 export const BROWSER_CSS = `
+.bt-panel-backdrop{display:none}
 .bt-panel{--bt-panel-view-fade:${SPRING_SHAPE.duration}ms}
 .bt-ptabs{position:relative;display:flex;align-items:center;height:44px;flex:none;border-bottom:.5px solid var(--bt-line);padding:0 6px;gap:0;animation:bt-strip-in ${SPRING_SHAPE.duration}ms ${SPRING_SHAPE.easing}}
 @keyframes bt-strip-in{from{height:0;opacity:0}}

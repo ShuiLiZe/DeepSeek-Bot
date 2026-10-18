@@ -340,6 +340,23 @@ export function apply(ctx) {
     for (const [id, owner] of pendingAdopt) if (owner === agentId && !ids.includes(id)) ids.push(id)
     return ids
   }
+  // Back in Bot mode the view must hold a team conversation; an outside Session
+  // left over from Agent mode would wear the Bot skin without one. The roster may
+  // still be loading, so wait for its first snapshot instead of giving up.
+  const home = () => {
+    const pick = () => {
+      const snapshot = roster.getSnapshot()
+      if (!snapshot.ready || !snapshot.mainBotId) return false
+      const list = ctx.sessions.list.getSnapshot()
+      const main = Object.values(list.byId ?? {}).find(session => (session?.retainedBy?.mainView ?? 0) > 0)?.id
+      if (main !== undefined && snapshot.byId[main] === undefined && snapshot.roomsById[main] === undefined) {
+        actions.openSession(snapshot.mainBotId)
+      }
+      return true
+    }
+    if (pick()) return
+    const off = roster.subscribe(() => { if (pick()) off() })
+  }
   const actions = {
     ...teamActions({ call, after, partFor, roster, ui, live, cards, turnClock }),
     // The full-pane overlays sit above the conversation, so opening one must dismiss them
@@ -425,6 +442,39 @@ export function apply(ctx) {
     toggleSidebar: () => { ctx.layout.toggleSidebar() },
     // Agent mode hands the surface back to the shell; everything open on the Bot
     // surface closes first so nothing stale reopens on the way back.
+    openNewChat: (mode) => { ui.set(state => ({ ...state, newChat: mode, menu: null, palette: null })) },
+    openPalette: (query = '') => { ui.set(state => ({ ...state, palette: { query, token: Date.now() }, newChat: null, menu: null })) },
+    // The token keeps a late exit timer from closing a palette opened again since.
+    closePalette: (token) => { ui.set(state => (state.palette && (token === undefined || state.palette.token === token) ? { ...state, palette: null } : state)) },
+    openExchange: (a, b) => { if (a && b) ui.set(state => ({ ...state, exchange: [a, b] })) },
+    openVoice: (id) => { if (id) ui.set(state => ({ ...state, voice: id, menu: null })) },
+    closeVoice: () => { ui.set(state => (state.voice ? { ...state, voice: null } : state)) },
+    toggleDetails: (id, force) => {
+      ui.set((state) => {
+        const details = force || state.details !== id || state.view !== 'details' ? id : null
+        return { ...state, renaming: false, tab: null, details, view: 'details' }
+      })
+    },
+    // The open panel follows the main view; a subject with no browser (a group
+    // chat, an outside Session) settles on the details view.
+    followPanel: (id) => {
+      ui.set((state) => {
+        if (!state.details || state.details === id) return state
+        const view = state.view === 'browser' && roster.getSnapshot().byId[id] === undefined ? 'details' : state.view
+        return { ...state, details: id, view, renaming: false, tab: null }
+      })
+    },
+    showDetails: (id, tab = null) => { ui.set(state => ({ ...state, details: id, view: 'details', renaming: false, tab })) },
+    // Opening the conversation would move focus to its composer and blur the name field.
+    renameBot: (id) => { ui.set(state => ({ ...state, details: id, view: 'details', renaming: true, tab: null })) },
+    // `id` opens one Bot (page 'bots') or one group chat (page 'groups').
+    openSettings: (page = 'general', id = null) => { ui.set(state => ({ ...state, settings: { page, id }, menu: null, palette: null, newChat: null })) },
+    closeSettings: () => { ui.set(state => (state.settings ? { ...state, settings: null } : state)) },
+    openMemory: (botId) => { ui.set(state => ({ ...state, memory: botId, menu: null, palette: null })) },
+    closeMemory: () => { ui.set(state => (state.memory ? { ...state, memory: null } : state)) },
+    openConnectors: () => { ui.set(state => ({ ...state, settings: { page: 'connectors', id: null }, menu: null, palette: null, newChat: null })) },
+    // Back in Bot mode the view must hold a team conversation; an outside
+    // Session left over from Agent mode would wear the Bot skin without one.
     setSurface: (mode) => {
       if (mode !== 'bot' && mode !== 'agent') return
       if (surface.getSnapshot().mode === mode) return
@@ -432,27 +482,24 @@ export function apply(ctx) {
         ui.set(state => ({ ...state, details: null, view: 'details', settings: null, palette: null, newChat: null, menu: null, voice: null, exchange: null, memory: null, toast: null }))
       }
       writeMode(mode)
+      // Swapping the groups is a synchronous unmount/mount, so on its own the whole
+      // interface snaps from one skin to the other. A veil painted over the shell
+      // before the swap and faded out after it turns that snap into a crossfade; it
+      // is the only handle we have, since a group install returns disposers, not a
+      // root element to animate. Its styles live in RETURN_CSS, which no surface
+      // change withdraws: the veil covers the very swap that takes SHELL_CSS away.
+      const veil = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'bt-surface-veil' }))
+      // A frame for the veil to paint, so the snap is never the frame the user sees.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        veil.classList.add('bt-surface-veil-out')
+        const gone = () => veil.remove()
+        // animationend is the clean exit; the timer covers a dropped animation,
+        // which would otherwise leave the veil on top of the interface for good.
+        veil.addEventListener('animationend', gone, { once: true })
+        setTimeout(gone, 400)
+      }))
       surface.set(state => ({ ...state, mode }))
-      if (mode !== 'bot') return
-      // Back in Bot mode the view must hold a team conversation; an outside
-      // Session left over from Agent mode would wear the Bot skin without one.
-      const home = () => {
-        const snapshot = roster.getSnapshot()
-        if (!snapshot.ready || !snapshot.mainBotId) return
-        const list = ctx.sessions.list.getSnapshot()
-        const main = Object.values(list.byId ?? {}).find(session => (session?.retainedBy?.mainView ?? 0) > 0)?.id
-        if (main !== undefined && snapshot.byId[main] === undefined && snapshot.roomsById[main] === undefined) {
-          actions.openSession(snapshot.mainBotId)
-        }
-      }
-      if (roster.getSnapshot().ready) home()
-      else {
-        const off = roster.subscribe(() => {
-          if (!roster.getSnapshot().ready) return
-          off()
-          home()
-        })
-      }
+      if (mode === 'bot') home()
     },
     markUnread: id => writeUnread(id, true),
     beginVisit: (id) => {

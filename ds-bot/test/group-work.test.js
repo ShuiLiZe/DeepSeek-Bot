@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { apply } from '../index.js'
 import { fakeAttachments, fakeContext } from './fake-ctx.js'
-import { MESSAGE_INLINE_MAX, ROOM_LATE_ROUNDS, ROOM_STEP_GAP_MS, ROOM_WORK_GRACE_MS } from '../src/host/constants.js'
+import { LOG_WRITE_FAILURES_MAX, MESSAGE_INLINE_MAX, ROOM_LATE_ROUNDS, ROOM_STEP_GAP_MS, ROOM_WORK_GRACE_MS, STOPPED_SETTLE_MS } from '../src/host/constants.js'
 
 // Chief, the admin of group 'r1', speaks there from 'ga'; Writer from 'gb'; Tester from 'gc'.
 const seed = (room = {}) => ({
@@ -29,6 +29,8 @@ async function start(t, room, services) {
   const home = mkdtempSync(join(tmpdir(), 'ds-bot-work-'))
   writeFileSync(join(home, 'state.json'), JSON.stringify(seed(room)))
   const ctx = fakeContext({ services })
+  let flushError
+  let pickWarn
   const agents = new Map()
   const agentOf = (sessionId) => {
     if (!agents.has(sessionId)) {
@@ -55,11 +57,14 @@ async function start(t, room, services) {
     workspaceRegistry: { get: () => undefined, resolveByPath: async () => undefined, create: async path => ({ id: 'w1', path }), archiveSession: async () => {} },
     sessionController: { create: async () => ({ sessionId: 's1' }), resolveAgent: async sessionId => ({ agent: agentOf(sessionId) }), selectModel: async () => {} },
     sessionTitle: { rename: async () => {} },
-    sessions: { flush: async () => {} },
+    sessions: { flush: async () => { if (flushError !== undefined) throw flushError } },
   })
   let route
   const register = ctx.connection.fetch.register
   ctx.connection.fetch.register = (options) => { route = options; return register(options) }
+  // rt.warn reaches the host through the logger, which is where a test can watch it.
+  const logged = []
+  ctx.logger.warn = (template, ...args) => { pickWarn?.(template, ...args); if (pickWarn === undefined) logged.push([template, ...args]) }
   apply(ctx, { home })
   t.after(async () => {
     await ctx.dispose()
@@ -105,7 +110,15 @@ async function start(t, room, services) {
     return { content: post.content, source: post.source }
   }
   await tool('list_bots', {}, 'a')
-  return { home, agentOf, emit, tool, call, begin, finish, round, say, takePost }
+  // A Session the host can no longer resolve, as one that went away while its turn was
+  // recorded as running.
+  const detached = new Set()
+  const detach = (sessionId) => { detached.add(sessionId) }
+  ctx.sessionController.resolveAgent = async (sessionId) => {
+    if (detached.has(sessionId)) throw new Error('no such session')
+    return { agent: agentOf(sessionId) }
+  }
+  return { home, agentOf, emit, tool, call, begin, finish, round, say, takePost, detach, failFlush: error => { flushError = error }, watchWarnings: into => { pickWarn = (...args) => into.push(args) } }
 }
 
 const settle = async (check) => {
@@ -792,4 +805,80 @@ test('deleting a working Bot clears its activity and tells the Bots waiting for 
   host.emit('b', 'turn/start', { turn: 2 })
   host.emit('b', 'turn/end', { turn: 1, reason: { kind: 'aborted' } })
   assert.equal((await host.call('state', {})).value.activity.b, undefined)
+})
+
+// A stop cancels through DSH, and a cancelled turn is expected to report its own
+// turn/end. When it does not — the Session is gone, or the cancel races its teardown —
+// the entry that says the Bot is working would never be cleared, and the app would show
+// it as working for the rest of the process's life.
+test('a stopped turn that never reports turn/end stops showing as working', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const host = await start(t)
+  host.emit('gb', 'turn/start', { turn: 1 })
+  host.emit('gb', 'tool/call', { callId: 'k1', name: 'pwsh', arguments: '{}' })
+  const before = await host.call('state', {})
+  assert.deepEqual(Object.keys(before.value.work.bots), ['b'])
+
+  assert.equal((await host.call('stop-member-work', { roomId: 'r1', botId: 'b' })).value, true)
+  // The cancel is asked for, but this Session never reports a turn/end for it.
+  await settle(() => host.agentOf('gb').cancelled.length === 1)
+  const during = await host.call('state', {})
+  assert.deepEqual(Object.keys(during.value.work.bots), ['b'])
+
+  // The backstop takes the stop as final once the grace period passes.
+  t.mock.timers.tick(STOPPED_SETTLE_MS)
+  await settle(() => true)
+  const after = await host.call('state', {})
+  assert.deepEqual(Object.keys(after.value.work.bots), [])
+  assert.deepEqual(after.value.activity, {})
+
+  // A turn that starts later and ends normally still clears itself: the backstop is
+  // disarmed by the turn/end, so it cannot clear an unrelated turn behind its back.
+  host.emit('gb', 'turn/start', { turn: 2 })
+  const again = await host.call('state', {})
+  assert.deepEqual(Object.keys(again.value.work.bots), ['b'])
+  host.finish('gb', '做完了。')
+  await settle(() => true)
+  const done = await host.call('state', {})
+  assert.deepEqual(Object.keys(done.value.work.bots), [])
+})
+
+// The member's Session is gone, so nothing will cancel the turn and nothing will report
+// a turn/end for it. The stop still has to clear the entry that shows it as working.
+test('a stop whose member Session cannot be resolved clears the entry at once', async (t) => {
+  const host = await start(t)
+  host.emit('gb', 'turn/start', { turn: 1 })
+  host.emit('gb', 'tool/call', { callId: 'k1', name: 'pwsh', arguments: '{}' })
+  assert.deepEqual(Object.keys((await host.call('state', {})).value.work.bots), ['b'])
+
+  host.detach('gb')
+  assert.equal((await host.call('stop-member-work', { roomId: 'r1', botId: 'b' })).value, true)
+  await settle(() => true)
+  const after = await host.call('state', {})
+  assert.deepEqual(Object.keys(after.value.work.bots), [])
+  assert.deepEqual(after.value.activity, {})
+})
+
+// A Session whose log the codec refuses to append to fails on every delivery. The group
+// has to go on, and the same failure must not be reported without end.
+test('a Session that cannot be written to fails its deliveries once, and the group goes on', async (t) => {
+  const host = await start(t)
+  const warnings = []
+  const failure = Object.assign(new Error('format v4 tool/result at seq 62 requires toolCallId matching its tool source'), { name: 'SessionFormatError' })
+  host.failFlush(failure)
+  host.watchWarnings(warnings)
+
+  const reported = () => warnings.filter(args => String(args[1] ?? '').includes('cannot be written to any more'))
+  // The round reaches its member, the delivery fails, and the round still resolves.
+  const first = host.round('c1', host.say('@Writer 写一段'))
+  await settle(() => reported().length === 1)
+  await settle(() => first() !== undefined)
+  assert.deepEqual(host.agentOf('gb').calls.length, 1)
+
+  // Further rounds keep failing, and the failure is reported only up to the cap.
+  for (let index = 0; index < 5; index += 1) {
+    const next = host.round(`c${index + 2}`, host.say('@Writer 再写一段'))
+    await settle(() => next() !== undefined)
+  }
+  assert.equal(reported().length, LOG_WRITE_FAILURES_MAX)
 })

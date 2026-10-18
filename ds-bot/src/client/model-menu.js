@@ -115,10 +115,12 @@ export function useAnchoredMenu() {
     const onKey = (event) => { if (event.key === 'Escape') { event.stopPropagation(); close(); button.current?.focus() } }
     const onScroll = (event) => { if (!menu.current?.contains(event.target)) close() }
     window.addEventListener('mousedown', onDown)
+    window.addEventListener('touchstart', onDown)
     window.addEventListener('keydown', onKey, true)
     window.addEventListener('scroll', onScroll, true)
     return () => {
       window.removeEventListener('mousedown', onDown)
+      window.removeEventListener('touchstart', onDown)
       window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('scroll', onScroll, true)
     }

@@ -275,16 +275,31 @@ export function TeamSidebar(props) {
     event.preventDefault()
     actions.openPalette(event.key)
   }
+  // Opening a view from the sidebar closes the mobile drawer it was opened from,
+  // so the view is not left behind the drawer on a phone.
+  const dismissMobileDrawer = () => {
+    const toggle = document.querySelector('[data-dsh-mobile-toggle]') || document.querySelector('button[class*="_toggle"]')
+    const drawer = document.querySelector('.dshm-drawer[data-open=true]') || document.querySelector('[data-pane="sidebar"][data-open=true]')
+    if (drawer && toggle) toggle.click()
+  }
+  const onSearchClick = () => {
+    dismissMobileDrawer()
+    actions.openPalette()
+  }
+  const onNewChatClick = () => {
+    dismissMobileDrawer()
+    actions.openNewChat('new')
+  }
   return h('div', { className: wide ? 'bt-side' : 'bt-side bt-rail', onKeyDown: typeToSearch },
     wide ? h('div', { className: 'bt-side-top' },
       h('span', { className: 'bt-brand' }, h(BrandMark, { size: 22 }), h(BrandName)),
       h(UpdateButton, { useUpdate: props.useUpdate, actions }),
-      h('button', { type: 'button', className: 'bt-round', 'aria-label': t('Search'), title: t('Search'), onClick: () => actions.openPalette() }, h(SearchIcon)),
+      h('button', { type: 'button', className: 'bt-round', 'aria-label': t('Search'), title: t('Search'), onClick: onSearchClick }, h(SearchIcon)),
       h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: () => actions.openNewChat('new') }, h(PlusIcon)),
       h('button', { type: 'button', className: 'bt-round bt-side-collapse', 'aria-label': t('Collapse sidebar'), title: t('Collapse sidebar'), onClick: () => actions.toggleSidebar() }, h(SidebarIcon)))
       : h(Fragment, null,
           h(UpdateButton, { useUpdate: props.useUpdate, actions }),
-          h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: () => actions.openNewChat('new') }, h(PlusIcon))),
+          h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: onNewChatClick }, h(PlusIcon))),
     wide && roster.readOnly ? h('div', { className: 'bt-hint bt-read-only', role: 'status' }, hostText(roster.readOnly)) : null,
     h('div', { ref: listRef, className: 'bt-list', role: 'region', 'aria-label': t('Bot list') },
       main ? h(BotRow, { ...rowProps, bot: main, marked: markedUnread[main.id] === true }) : roster.ready ? null : h('div', { className: 'bt-hint' }, t('Setting up your Main Bot…')),
@@ -405,10 +420,11 @@ export function ConnectPlugins({ wide, actions }) {
   return h('span', { className: 'bt-connect-wrap' },
     h('button', {
       ref: button, type: 'button', className: 'bt-connect bt-connect-foot', 'aria-describedby': tip ? tipId : undefined,
+      'aria-label': t('Connect plugins'), title: t('Connect plugins'),
       onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide,
       onClick: () => actions.selectPanel('plugins'),
     },
-    h(PlugIcon), t('Connect plugins'), h('span', { className: 'bt-connect-warn', 'aria-hidden': true }, '!')),
+    h(PlugIcon), h('span', { className: 'bt-connect-label' }, t('Connect plugins'))),
     tip && box ? createPortal(h('span', { role: 'tooltip', id: tipId, className: 'bt-connect-tip', style: box },
       t('Plugin compatibility is not fully verified.')), document.body) : null)
 }
@@ -509,12 +525,21 @@ export function AccountLauncher({ seat = true, settingsOpen, openSettings, openO
     }
     const onKey = (event) => { if (event.key === 'Escape') { event.stopPropagation(); setOpen(false); button.current?.focus() } }
     window.addEventListener('mousedown', onDown)
+    window.addEventListener('touchstart', onDown, { passive: true })
     window.addEventListener('keydown', onKey, true)
-    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey, true) }
+    return () => {
+      window.removeEventListener('mousedown', onDown)
+      window.removeEventListener('touchstart', onDown)
+      window.removeEventListener('keydown', onKey, true)
+    }
   }, [open])
-  const toggle = () => {
+  const toggle = (event) => {
+    event?.stopPropagation?.()
     const rect = button.current?.getBoundingClientRect()
-    if (rect) setBox({ left: rect.left, bottom: window.innerHeight - rect.top + 5 })
+    if (rect) {
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - 268))
+      setBox({ left, bottom: window.innerHeight - rect.top + 5 })
+    }
     setOpen(value => !value)
   }
   const groups = [
@@ -587,6 +612,8 @@ export function BotReturn({ wide, useSurface, actions }) {
 }
 
 // Agent mode has none of the shell-group styles, so the return button carries its own.
+// The surface veil lives here too: the swap it covers is the one that withdraws
+// SHELL_CSS, so a veil styled from that sheet loses its rules before it is ever seen.
 export const RETURN_CSS = `
 .bt-return{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:0;border-radius:999px;background:none;color:inherit;font:inherit;font-size:14px;line-height:20px;cursor:pointer;transition:background-color .12s ease}
 .bt-return:hover{background:rgba(127,127,127,.14)}
@@ -596,6 +623,14 @@ export const RETURN_CSS = `
 /* Shell styles carry --bt-ink-deepseek and Agent mode withdraws them; pin it here. */
 .bt-return .bt-mark{--bt-ink-deepseek:#4D6BFE}
 .bt-return-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Covers the shell across a surface swap so Agent mode and Bot mode cross-fade
+   instead of snapping. It paints the destination background rather than the old
+   one, so the new skin fades in from a flat colour of its own tone. */
+.bt-surface-veil{position:fixed;inset:0;z-index:9999;pointer-events:none;background:var(--bt-main);animation:bt-fade-in .12s ease-out both}
+.bt-surface-veil-out{animation:bt-fade-out .2s ease-out both}
+@keyframes bt-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes bt-fade-out{from{opacity:1}to{opacity:0}}
+@media (prefers-reduced-motion:reduce){.bt-surface-veil,.bt-surface-veil-out{animation-duration:.01s}}
 `
 
 export function BrandMark({ size = 24 }) {
@@ -620,6 +655,11 @@ export const SIDEBAR_CSS = `
 [class*="_footArea"]>[class*="_footerActions"]>div>.bt-foot-account{grid-column:1;order:1;display:inline-flex}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_footerActions"]>div>.bt-connect-wrap{grid-column:2}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{grid-column:3}
+.bt-connect-warn{display:none!important}
+/* The foot button is an icon-only circle. Keyed on the plugin's own class so it
+   holds even where the shell's footer container is not named "_footArea". */
+.bt-connect-foot{order:0!important;flex:0 0 36px!important;width:36px!important;height:36px!important;min-width:36px!important;max-width:36px!important;padding:0!important;border-radius:999px!important;overflow:hidden!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:0!important}
+.bt-connect-foot .bt-connect-label{display:none!important}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
 
 /* The update cloud springs in when a newer DS Bot shows up; its arrow drops in a
