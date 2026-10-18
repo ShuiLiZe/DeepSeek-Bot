@@ -9,6 +9,10 @@
 
 [English](README.md) | 中文
 
+> **安装本改版（ShuiLiZe fork）**：在 DSH「插件 → 添加插件」的「包名或地址」里填
+> `github:ShuiLiZe/DeepSeek-Bot#main&path:/ds-bot`（需要装 Git），选择安装并启用，然后完全退出 DSH 再打开。
+> 下文「安装」一节里的 `ds-bot` 和 `github:Fei2411/...` 装的是上游原版。本 fork 不发 Release，插件内不会提示自动更新，更新时重新安装上面的地址即可。
+
 ![版本](https://img.shields.io/badge/版本-v0.1_预览-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.1--alpha.1-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
 
 DeepSeek Bot（简称 DS Bot）是一个基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（简称 dsh）的 bot 插件，插件将 dsh 改造为 bot 形式。你可以与自己创建的 bot 交流、工作。
