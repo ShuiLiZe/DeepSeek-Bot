@@ -2947,13 +2947,20 @@ body :is(input,textarea,[contenteditable=true],[contenteditable=plaintext-only],
 }
 
 /* ---- Settings: stack the two-pane layout on a phone --------------------- */
-/* The settings dialog is a nav rail (198px) beside a page; side by side it
-   leaves almost no room for content on a phone. Stack and let it fill. */
+/* The settings dialog is a nav rail (198px) beside a page sized from the desktop
+   dialog width. On a phone: nav becomes a scrollable strip on top, the page fills
+   the rest, and the close button clears the status bar. */
 @media (max-width:640px){
-.bt-settings{width:100vw!important;max-width:100vw!important;height:100%!important;border-radius:0!important;border:0!important}
-.bt-settings-nav{width:100%!important;flex-direction:row!important;overflow-x:auto;border-right:0!important;border-bottom:.5px solid var(--bt-line);gap:4px;scrollbar-width:none}
+.bt-settings-layer{inset:0!important}
+.bt-settings{width:100vw!important;max-width:100vw!important;height:100%!important;border-radius:0!important;border:0!important;flex-direction:column!important;padding-top:env(safe-area-inset-top);box-sizing:border-box}
+.bt-settings-nav{width:100%!important;flex:none!important;flex-direction:row!important;align-items:center;overflow-x:auto;overflow-y:hidden;border-right:0!important;border-bottom:.5px solid var(--bt-line);gap:4px;padding:8px 56px 8px 8px!important;scrollbar-width:none}
 .bt-settings-nav::-webkit-scrollbar{display:none}
-.bt-settings-item{flex:none;white-space:nowrap}
+.bt-settings-nav>.bt-thumb{display:none!important}
+.bt-settings-nav .bt-settings-item{flex:none;white-space:nowrap}
+.bt-settings-nav .bt-settings-item[aria-current=page]{background:var(--bt-active)!important;color:var(--bt-ink)}
+.bt-settings-main{flex:1 1 auto!important;width:100%!important;height:auto!important;min-height:0!important;padding-bottom:env(safe-area-inset-bottom);box-sizing:border-box}
+.bt-settings-head{padding:12px 16px 4px!important}
+.bt-settings-close{top:calc(env(safe-area-inset-top) + 8px)!important;right:8px!important;width:40px!important;height:40px!important;z-index:2}
 }
 
 /* ---- Touch targets ----------------------------------------------------- */
@@ -2965,11 +2972,66 @@ body :is(input,textarea,[contenteditable=true],[contenteditable=plaintext-only],
 .bt-menu button,.bt-menu [role=menuitem]{min-height:40px}
 }
 
-/* ---- Right details drawer goes full width on a phone ------------------- */
+/* ---- Right details panel goes full width on a phone --------------------- */
 @media (max-width:640px){
+.bt-panel{left:0!important;width:100vw!important;border-left:0!important;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);box-sizing:border-box}
+.bt-panel-grip{display:none!important}
 .bt-drawer-body{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
 }
+
+/* ---- Inside dsh-mobile: keep DS Bot layers above the mobile shell -------- */
+/* dsh-mobile stacks its drawer (240), details sheet (80) and overlay host (300)
+   above the page. DS Bot portals its menus and dialogs into document.body at
+   40-70, so on a phone they opened underneath the drawer: visible but not
+   tappable, or hidden entirely. Lift them only when the dsh-mobile shell is here. */
+body:has(.dshm-shell) :is(.bt-menu,.bt-react-strip,.bt-update-pop,.bt-connect-tip){z-index:330!important}
+body:has(.dshm-shell) :is(.bt-settings-layer,.bt-mem-layer,.bt-palette-layer){z-index:320!important}
+body:has(.dshm-shell) .bt-panel{z-index:90!important}
+body:has(.dshm-shell) .bt-toast{z-index:1000!important}
 `;
+var BOT_LAYERS = [
+  ".bt-menu",
+  ".bt-react-strip",
+  ".bt-update-pop",
+  ".bt-us-pick",
+  ".bt-avedit",
+  ".bt-settings-layer",
+  ".bt-mem-layer",
+  ".bt-palette-layer",
+  ".bt-newchat",
+  ".bt-dialog",
+  ".bt-create",
+  ".bt-voice-stage",
+  ".bt-panel"
+].join(",");
+var shown = (element) => {
+  if (element.closest("[data-leaving]")) return false;
+  const style = getComputedStyle(element);
+  return style.display !== "none" && style.visibility !== "hidden" && element.getClientRects().length > 0;
+};
+function installMobileBack() {
+  if (typeof window === "undefined" || window.__dsBotMobileBack) return () => {
+  };
+  const original = window.dispatchEvent;
+  const patched = function(event) {
+    if (this === window && event?.type === "dsh-mobile:native-back" && event.cancelable && !event.defaultPrevented) {
+      const open = [...document.querySelectorAll(BOT_LAYERS)].filter(shown);
+      if (open.length > 0) {
+        event.preventDefault();
+        const target = document.activeElement && open.some((layer) => layer.contains(document.activeElement)) ? document.activeElement : document.body;
+        target.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true, cancelable: true }));
+        return false;
+      }
+    }
+    return original.call(this, event);
+  };
+  window.dispatchEvent = patched;
+  window.__dsBotMobileBack = true;
+  return () => {
+    if (window.dispatchEvent === patched) window.dispatchEvent = original;
+    delete window.__dsBotMobileBack;
+  };
+}
 
 // src/client/mark.js
 var import_react2 = require("react");
@@ -3649,11 +3711,11 @@ function SecretToolCell({ sessionId, callId, name, done, content, roster, action
 }
 function SecretDock({ sessionId, useRoster, useCards, useSession, actions }) {
   const roster = useRoster((value) => value);
-  const shown = useCards?.((state) => state[sessionId]) ?? NONE;
+  const shown2 = useCards?.((state) => state[sessionId]) ?? NONE;
   const loading = useSession?.(historyLoading) === true;
   const bot = roster.byId[sessionId];
   if (!bot || currentPart(bot) !== sessionId) return null;
-  const drawn = (entry) => entry.callId && entry.sessionId === sessionId && (loading || shown[entry.callId] > 0);
+  const drawn = (entry) => entry.callId && entry.sessionId === sessionId && (loading || shown2[entry.callId] > 0);
   const waiting = (roster.secretRequests?.[bot.id] ?? []).filter((entry) => entry.status === "pending" && !drawn(entry));
   if (waiting.length === 0) return null;
   return (0, import_react5.createElement)("div", { className: "bt-q-dock bt-secret-dock" }, waiting.map((request) => (0, import_react5.createElement)(SecretCard, { key: `${request.id}:${request.kind}`, bot, request, roster, actions })));
@@ -3995,9 +4057,9 @@ function Bubbles({ texts: texts2, roster, selfId, actions, streaming, sessionId,
   );
 }
 function Bubble({ text, index, roster, selfId, actions, sessionId, msgKey, mentions, fold, picked, live, lead, whole }) {
-  const { shown, folded, control } = useFold(text, { limit: fold, whole, live });
+  const { shown: shown2, folded, control } = useFold(text, { limit: fold, whole, live });
   const key = msgKey ? `${msgKey}:${index}` : void 0;
-  const body = (0, import_react7.createElement)(import_dsh_client_ui_primitives.MarkdownText, { text: linkMentions(shown, roster.bots, selfId), streaming: live, labels: mdLabels(), variant: "compact", fileMentions: mentions });
+  const body = (0, import_react7.createElement)(import_dsh_client_ui_primitives.MarkdownText, { text: linkMentions(shown2, roster.bots, selfId), streaming: live, labels: mdLabels(), variant: "compact", fileMentions: mentions });
   return (0, import_react7.createElement)(
     "div",
     { className: "bt-msg" },
@@ -4011,7 +4073,7 @@ function Bubble({ text, index, roster, selfId, actions, sessionId, msgKey, menti
         control ? (0, import_react7.createElement)("div", { className: "bt-fold-body" }, body) : body,
         control
       ),
-      live ? null : (0, import_react7.createElement)(MessageTools, { text: folded ? text : shown, name: roster.byId[selfId]?.name ?? t("Bot"), sessionId, react: key ? (emoji) => actions.toggleReaction(msgKey, index, emoji) : void 0, actions })
+      live ? null : (0, import_react7.createElement)(MessageTools, { text: folded ? text : shown2, name: roster.byId[selfId]?.name ?? t("Bot"), sessionId, react: key ? (emoji) => actions.toggleReaction(msgKey, index, emoji) : void 0, actions })
     ),
     picked.length ? (0, import_react7.createElement)("div", { className: "bt-reacts" }, picked.map((emoji) => (0, import_react7.createElement)("button", {
       key: emoji,
@@ -4254,8 +4316,8 @@ var scrollParent = (node) => {
   return null;
 };
 function EarlierUser({ row }) {
-  const { shown, folded, control } = useFold(row.text ?? "");
-  const body = row.text ? (0, import_react7.createElement)(import_dsh_client_ui_primitives.MarkdownText, { text: shown, labels: mdLabels(), variant: "compact" }) : null;
+  const { shown: shown2, folded, control } = useFold(row.text ?? "");
+  const body = row.text ? (0, import_react7.createElement)(import_dsh_client_ui_primitives.MarkdownText, { text: shown2, labels: mdLabels(), variant: "compact" }) : null;
   return (0, import_react7.createElement)("div", { className: "bt-urow" }, (0, import_react7.createElement)(
     "div",
     { className: "bt-ububble", "data-folded": folded || void 0 },
@@ -4907,21 +4969,21 @@ function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, us
   const inputAt = Math.max(inputRef.current, pendingInput);
   inputRef.current = inputAt;
   const want = !visible ? null : inputAt > (tool?.at ?? 0) ? { key: `input:${inputAt}`, pool: PHRASES.thinking, state: "thinking" } : tool ? { key: tool.label ? `tool:${tool.label}` : "working", label: tool.label, pool: PHRASES.working, state: tool.state ?? "working" } : { key: "thinking", pool: PHRASES.thinking, state: "thinking" };
-  const [shown, setShown] = (0, import_react8.useState)(null);
+  const [shown2, setShown] = (0, import_react8.useState)(null);
   const wantKey = want?.key ?? null;
   const markState = (0, import_react8.useRef)("thinking");
   if (want) markState.current = want.state;
   (0, import_react8.useEffect)(() => {
-    if (wantKey === null || shown?.key === wantKey) return void 0;
+    if (wantKey === null || shown2?.key === wantKey) return void 0;
     const make = () => setShown({ key: wantKey, text: want.label ?? drawPhrase(want.pool), at: Date.now() });
-    const wait = shown ? shown.at + PHRASE_HOLD_MS - Date.now() : 0;
+    const wait = shown2 ? shown2.at + PHRASE_HOLD_MS - Date.now() : 0;
     if (wait <= 0) {
       make();
       return void 0;
     }
     const timer = setTimeout(make, wait);
     return () => clearTimeout(timer);
-  }, [wantKey, shown]);
+  }, [wantKey, shown2]);
   const [phase, setPhase] = (0, import_react8.useState)(null);
   const endedAt = (0, import_react8.useRef)(0);
   const shift = (0, import_react8.useRef)(null);
@@ -4961,8 +5023,8 @@ function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, us
     return () => clearInterval(timer);
   }, [phase]);
   const host = useRunningHost(running);
-  if (!host || phase === null || !shown) return null;
-  const elapsed = now - shown.at >= 6e4 ? elapsedLabel(now - shown.at) : null;
+  if (!host || phase === null || !shown2) return null;
+  const elapsed = now - shown2.at >= 6e4 ? elapsedLabel(now - shown2.at) : null;
   return (0, import_react_dom2.createPortal)((0, import_react8.createElement)(
     "div",
     { className: "bt-typing", "data-exiting": phase === "out" ? "" : void 0, "aria-hidden": true },
@@ -4972,8 +5034,8 @@ function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, us
       { className: "bt-typing-text" },
       (0, import_react8.createElement)(
         "span",
-        { key: `${shown.key}:${shown.at}`, className: "bt-typing-label" },
-        (0, import_react8.createElement)(Shimmer, null, `${shown.text}…`),
+        { key: `${shown2.key}:${shown2.at}`, className: "bt-typing-label" },
+        (0, import_react8.createElement)(Shimmer, null, `${shown2.text}…`),
         elapsed ? (0, import_react8.createElement)("span", { className: "bt-typing-time" }, `· ${elapsed}`) : null
       )
     )
@@ -5764,7 +5826,7 @@ var MEMORY_NOTICE_MS = 3200;
 var noNews = (select) => select({});
 function useMemoryNotice(ids, useMemoryNews) {
   const seen = useMemoryNews((map) => Math.max(0, ...ids.map((id) => map?.[id]?.seen ?? 0)));
-  const [shown, setShown] = (0, import_react10.useState)(false);
+  const [shown2, setShown] = (0, import_react10.useState)(false);
   (0, import_react10.useEffect)(() => {
     const left = seen + MEMORY_NOTICE_MS - Date.now();
     setShown(seen > 0 && left > 0);
@@ -5772,15 +5834,15 @@ function useMemoryNotice(ids, useMemoryNews) {
     const timer = setTimeout(() => setShown(false), left);
     return () => clearTimeout(timer);
   }, [seen]);
-  return shown;
+  return shown2;
 }
-function MemoryNotice({ shown }) {
+function MemoryNotice({ shown: shown2 }) {
   const inner = (0, import_react10.useRef)(null);
   const [width, setWidth] = (0, import_react10.useState)(0);
   const label = t("Memory updated");
   (0, import_react10.useLayoutEffect)(() => {
-    if (shown) setWidth(inner.current?.scrollWidth ?? 0);
-  }, [label, shown]);
+    if (shown2) setWidth(inner.current?.scrollWidth ?? 0);
+  }, [label, shown2]);
   return (0, import_react10.createElement)(
     "span",
     { className: "bt-pill-mem", "aria-hidden": true, style: { "--bt-mem-w": `${width}px` } },
@@ -6097,7 +6159,7 @@ function menuIcons(roster) {
 function ComposerPlus({ sessionId, inputActions, useRoster, actions }) {
   const roster = useRoster((value) => value);
   const [open, setOpen] = (0, import_react11.useState)(null);
-  const [shown, leaving] = useLinger(open, 120);
+  const [shown2, leaving] = useLinger(open, 120);
   const button = (0, import_react11.useRef)(null);
   const menu = (0, import_react11.useRef)(null);
   (0, import_react11.useEffect)(() => {
@@ -6155,14 +6217,14 @@ function ComposerPlus({ sessionId, inputActions, useRoster, actions }) {
       onMouseDown: keepComposerFocus,
       onClick: toggle
     }, (0, import_react11.createElement)(PlusIcon)),
-    shown ? (0, import_react_dom5.createPortal)((0, import_react11.createElement)(
+    shown2 ? (0, import_react_dom5.createPortal)((0, import_react11.createElement)(
       "div",
       {
         ref: menu,
         className: "bt-menu bt-menu-up bt-plus-menu",
         role: "menu",
         "aria-label": t("Add"),
-        style: { left: shown.left, bottom: shown.bottom },
+        style: { left: shown2.left, bottom: shown2.bottom },
         "data-leaving": leaving || void 0
       },
       (0, import_react11.createElement)("button", { type: "button", role: "menuitem", onClick: attach }, (0, import_react11.createElement)(PaperclipIcon), (0, import_react11.createElement)("span", { className: "bt-menu-label" }, t("Add files"))),
@@ -6507,11 +6569,11 @@ function CommandPalette({ start, token, roster, actions, useSessions }) {
   if (commands.length) sections.push([t("Commands"), commands]);
   const rows = sections.flatMap(([, items]) => items);
   const active = Math.min(cursor, Math.max(rows.length - 1, 0));
-  const shown = rows.map((row) => row.key).join("\n");
+  const shown2 = rows.map((row) => row.key).join("\n");
   const glide = useGlide(`${active}
-${shown}`, { axis: "y", ...QUICK_EDGES });
+${shown2}`, { axis: "y", ...QUICK_EDGES });
   const listRef = glide.box;
-  useFlip(listRef, shown, "[data-flip]");
+  useFlip(listRef, shown2, "[data-flip]");
   (0, import_react13.useEffect)(() => {
     listRef.current?.querySelector("[aria-selected=true]")?.scrollIntoView({ block: "nearest" });
   }, [active, query]);
@@ -6750,7 +6812,7 @@ function useAnchoredMenu() {
 }
 function ModelMenu({ bot, roster, actions, run, wide = false, onPick, onPickEffort }) {
   const { isOpen, shownPlace, leaving, button, menu, open, close } = useAnchoredMenu();
-  const shown = modelOf(bot, roster);
+  const shown2 = modelOf(bot, roster);
   const current = bot.model ?? bot.appliedModel;
   const served = servedOf(roster, current);
   const reasoning = useEfforts(served, current, actions);
@@ -6788,15 +6850,15 @@ function ModelMenu({ bot, roster, actions, run, wide = false, onPick, onPickEffo
         "data-wide": wide || void 0,
         "aria-haspopup": "menu",
         "aria-expanded": isOpen,
-        "aria-label": t("Model: {model}", { model: shown?.name ?? t("none") }),
-        "data-missing": shown !== void 0 && !shown.served && models.length > 0 ? "" : void 0,
+        "aria-label": t("Model: {model}", { model: shown2?.name ?? t("none") }),
+        "data-missing": shown2 !== void 0 && !shown2.served && models.length > 0 ? "" : void 0,
         onClick: toggle
       },
       (0, import_react14.createElement)(
         "span",
         { className: "bt-model-copy" },
-        (0, import_react14.createElement)("span", { className: "bt-model-name" }, shown?.name ?? t("Choose a model")),
-        shown ? (0, import_react14.createElement)("span", { className: "bt-model-provider" }, shown.served || models.length === 0 ? effortLabel === void 0 ? shown.provider : `${shown.provider} · ${effortLabel}` : t("{provider} · not available", { provider: shown.provider })) : null
+        (0, import_react14.createElement)("span", { className: "bt-model-name" }, shown2?.name ?? t("Choose a model")),
+        shown2 ? (0, import_react14.createElement)("span", { className: "bt-model-provider" }, shown2.served || models.length === 0 ? effortLabel === void 0 ? shown2.provider : `${shown2.provider} · ${effortLabel}` : t("{provider} · not available", { provider: shown2.provider })) : null
       ),
       (0, import_react14.createElement)(Caret)
     ),
@@ -6818,10 +6880,10 @@ function ModelChoiceDock({ sessionId, useRoster, actions }) {
   const bot = roster.byId[sessionId];
   const [busy, setBusy] = (0, import_react14.useState)("");
   const [error, setError] = (0, import_react14.useState)("");
-  const shown = Boolean(bot) && currentPart(bot) === sessionId && roster.ready;
+  const shown2 = Boolean(bot) && currentPart(bot) === sessionId && roster.ready;
   (0, import_react14.useEffect)(() => {
-    if (shown) void actions.refreshModels?.();
-  }, [shown, sessionId]);
+    if (shown2) void actions.refreshModels?.();
+  }, [shown2, sessionId]);
   if (!bot || currentPart(bot) !== sessionId || !roster.ready) return null;
   const models = roster.models ?? [];
   const lost = bot.model ? !models.some((model) => model.ref === bot.model) : false;
@@ -7326,7 +7388,7 @@ function SchedulesPage({ roster, actions, start }) {
   const [adding, setAdding] = (0, import_react16.useState)(Boolean(start));
   if (view === null) return (0, import_react16.createElement)("div", { className: "bt-set-hint" }, t("Loading…"));
   if (!view.available) return (0, import_react16.createElement)(AutomationOff);
-  const shown = (next) => {
+  const shown2 = (next) => {
     publish(next);
     setAdding(false);
   };
@@ -7335,7 +7397,7 @@ function SchedulesPage({ roster, actions, start }) {
     ...roster.rooms.map((room2) => [room2.id, (0, import_react16.createElement)(RoomAvatar, { room: room2, roster, size: 18 }), room2.name, view.tasks.filter((task) => task.botId === void 0 && task.roomId === room2.id)])
   ].filter(([, , , tasks]) => tasks.length > 0);
   return [
-    adding ? (0, import_react16.createElement)(TaskForm, { key: "form", roster, actions, start, onDone: shown, onCancel: () => setAdding(false) }) : (0, import_react16.createElement)("div", { key: "add", className: "bt-actions" }, (0, import_react16.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm bt-with-icon", onClick: () => setAdding(true) }, (0, import_react16.createElement)(PlusIcon), t("New task"))),
+    adding ? (0, import_react16.createElement)(TaskForm, { key: "form", roster, actions, start, onDone: shown2, onCancel: () => setAdding(false) }) : (0, import_react16.createElement)("div", { key: "add", className: "bt-actions" }, (0, import_react16.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm bt-with-icon", onClick: () => setAdding(true) }, (0, import_react16.createElement)(PlusIcon), t("New task"))),
     byChat.length === 0 && !adding ? (0, import_react16.createElement)("div", { key: "none", className: "bt-set-card" }, (0, import_react16.createElement)("div", { className: "bt-set-row" }, (0, import_react16.createElement)("span", { className: "bt-set-hint" }, t("No scheduled tasks yet.")))) : byChat.map(([id, avatar, name, tasks]) => (0, import_react16.createElement)(
       "section",
       { key: id, className: "bt-set-section" },
@@ -8104,9 +8166,9 @@ function SwitchRow({ label, hint, on, disabled, onChange }) {
   );
 }
 function modelHint(bot, roster) {
-  const shown = modelOf(bot, roster);
-  if (shown === void 0) return t("Pick the model this Bot runs on.");
-  if (!shown.served && (roster.models ?? []).length > 0) return t("This model is not available now. Pick another one.");
+  const shown2 = modelOf(bot, roster);
+  if (shown2 === void 0) return t("Pick the model this Bot runs on.");
+  if (!shown2.served && (roster.models ?? []).length > 0) return t("This model is not available now. Pick another one.");
   if (bot.appliedModel && bot.appliedModel === bot.model) return t("Every message of this Bot runs on it.");
   return t("Applies from the next message.");
 }
@@ -9661,7 +9723,7 @@ function titleOf(range, bucket) {
   return dates({ year: "numeric", month: "long" }).format(bucket.start);
 }
 function useTween(value) {
-  const [shown, setShown] = (0, import_react26.useState)(0);
+  const [shown2, setShown] = (0, import_react26.useState)(0);
   const from = (0, import_react26.useRef)(0);
   (0, import_react26.useEffect)(() => {
     if (reducedMotion() || typeof requestAnimationFrame !== "function") {
@@ -9681,7 +9743,7 @@ function useTween(value) {
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
   }, [value]);
-  return shown;
+  return shown2;
 }
 var glyphBox = (size, icon2) => (0, import_react26.createElement)("span", { className: "bt-us-glyph", style: { width: size, height: size } }, (0, import_react26.createElement)(icon2));
 function ModelGlyph({ name, paint, size }) {
@@ -9742,7 +9804,7 @@ ${names}`, { box: boxRef });
   );
 }
 function Stats({ range, total, previous }) {
-  const shown = useTween(total.total);
+  const shown2 = useTween(total.total);
   const change = previous > 0 ? Math.round((total.total - previous) / previous * 100) : null;
   const cell = (label, value) => (0, import_react26.createElement)("div", { className: "bt-us-stat" }, (0, import_react26.createElement)("span", { className: "bt-us-stat-label" }, label), (0, import_react26.createElement)("span", { className: "bt-us-stat-value" }, value));
   return (0, import_react26.createElement)(
@@ -9755,7 +9817,7 @@ function Stats({ range, total, previous }) {
       (0, import_react26.createElement)(
         "span",
         { className: "bt-us-stat-value" },
-        compact(shown),
+        compact(shown2),
         (0, import_react26.createElement)("small", null, t("tokens")),
         change === null ? null : (0, import_react26.createElement)(
           "span",
@@ -10645,7 +10707,7 @@ function FeedbackPage({ actions, run, Section, Row: Row3 }) {
   const browserErrors = report ? clientErrors().map((entry) => ({ ...entry, source: "browser" })) : [];
   const entries2 = [...report?.entries ?? [], ...browserErrors].sort((a, b) => new Date(b.time) - new Date(a.time));
   const total = (report?.total ?? 0) + browserErrors.length;
-  const shown = entries2.slice(0, 8);
+  const shown2 = entries2.slice(0, 8);
   return [
     (0, import_react28.createElement)(
       Section,
@@ -10683,7 +10745,7 @@ function FeedbackPage({ actions, run, Section, Row: Row3 }) {
     (0, import_react28.createElement)(
       Section,
       { key: "errors", title: report ? t("Recent errors · {count}", { count: total }) : t("Recent errors") },
-      shown.length === 0 ? (0, import_react28.createElement)(Row3, { label: t("No errors recorded."), hint: t("Failed model calls and DS Bot problems show here, newest first.") }) : shown.map((entry, index) => (0, import_react28.createElement)(
+      shown2.length === 0 ? (0, import_react28.createElement)(Row3, { label: t("No errors recorded."), hint: t("Failed model calls and DS Bot problems show here, newest first.") }) : shown2.map((entry, index) => (0, import_react28.createElement)(
         "div",
         { key: `${entry.time}-${index}`, className: "bt-set-row bt-fb-entry", title: entry.text },
         (0, import_react28.createElement)("span", { className: "bt-fb-dot", "data-level": entry.level, "aria-hidden": true }),
@@ -10773,12 +10835,12 @@ function botHint(update) {
   const checked = t("Checked {time}", { time: whenText(update.checkedAt) });
   return `${update.latest ? t("Up to date") : t("Could not check for updates.")} · ${checked}`;
 }
-function dshHint(dsh, shown) {
+function dshHint(dsh, shown2) {
   if (dsh.phase === "installing") return t("Updating DSH…");
   if (dsh.phase === "installed") return t("Restart DSH to start using DSH {version}.", { version: dsh.installed ?? dsh.verified });
   if (dsh.phase === "failed") return t("The update did not finish: {reason}", { reason: hostText(dsh.error ?? "") });
   if (dsh.available === false && dsh.blockedBy) return t("Update DS Bot {version} first.", { version: dsh.blockedBy });
-  if (shown) return t("DSH {version} is available", { version: dsh.verified });
+  if (shown2) return t("DSH {version} is available", { version: dsh.verified });
   return t("Version {version}", { version: dsh.current });
 }
 var linkProps = (href) => ({ className: "bt-soft bt-soft-sm bt-about-link", href, target: "_blank", rel: "noopener noreferrer" });
@@ -11109,19 +11171,19 @@ function SettingsDialog({ page, id, roster, actions, useUpdate, leaving = false 
   });
   const bot = page === "bots" && id ? roster.byId[id] : void 0;
   const room2 = page === "groups" && id ? roster.roomsById[id] : void 0;
-  const shown = SETTINGS_PAGES.some(([key]) => key === page) ? page : "general";
-  const usageFocus = shown === "usage" && id ? id : null;
-  const label = t(SETTINGS_PAGES.find(([key]) => key === shown)[1]);
+  const shown2 = SETTINGS_PAGES.some(([key]) => key === page) ? page : "general";
+  const usageFocus = shown2 === "usage" && id ? id : null;
+  const label = t(SETTINGS_PAGES.find(([key]) => key === shown2)[1]);
   const back = bot ? t("Back to Bots") : room2 ? t("Back to group chats") : usageFocus ? t("All usage") : null;
-  const nav = useGlide(shown, { axis: "y" });
-  const pageKey = `${shown}:${bot?.id ?? room2?.id ?? ""}`;
+  const nav = useGlide(shown2, { axis: "y" });
+  const pageKey = `${shown2}:${bot?.id ?? room2?.id ?? ""}`;
   const depth = bot || room2 ? 1 : 0;
   const last = (0, import_react30.useRef)({ key: pageKey, depth, move: "up" });
   if (last.current.key !== pageKey) {
     last.current = { key: pageKey, depth, move: depth > last.current.depth ? "in" : depth < last.current.depth ? "out" : "up" };
   }
-  const [usageOpened, setUsageOpened] = (0, import_react30.useState)(shown === "usage");
-  if (shown === "usage" && !usageOpened) setUsageOpened(true);
+  const [usageOpened, setUsageOpened] = (0, import_react30.useState)(shown2 === "usage");
+  if (shown2 === "usage" && !usageOpened) setUsageOpened(true);
   const errorLine = error ? (0, import_react30.createElement)("div", { className: "bt-error", role: "alert", style: { padding: 0 } }, error) : null;
   return (0, import_react30.createElement)(
     "div",
@@ -11138,7 +11200,7 @@ function SettingsDialog({ page, id, roster, actions, useUpdate, leaving = false 
           key,
           type: "button",
           className: "bt-settings-item",
-          "aria-current": shown === key ? "page" : void 0,
+          "aria-current": shown2 === key ? "page" : void 0,
           onClick: () => actions.openSettings(key)
         }, (0, import_react30.createElement)(PAGE_ICONS[key]), t(text))),
         (0, import_react30.createElement)("button", {
@@ -11157,29 +11219,29 @@ function SettingsDialog({ page, id, roster, actions, useUpdate, leaving = false 
         (0, import_react30.createElement)(
           "div",
           { className: "bt-settings-head" },
-          back ? (0, import_react30.createElement)("button", { type: "button", className: "bt-icon-btn", "aria-label": back, title: back, onClick: () => actions.openSettings(shown) }, (0, import_react30.createElement)(ChevronLeftIcon)) : null,
-          (0, import_react30.createElement)("h2", { key: bot?.id ?? room2?.id ?? shown }, bot?.name ?? room2?.name ?? label)
+          back ? (0, import_react30.createElement)("button", { type: "button", className: "bt-icon-btn", "aria-label": back, title: back, onClick: () => actions.openSettings(shown2) }, (0, import_react30.createElement)(ChevronLeftIcon)) : null,
+          (0, import_react30.createElement)("h2", { key: bot?.id ?? room2?.id ?? shown2 }, bot?.name ?? room2?.name ?? label)
         ),
-        shown === "usage" ? null : (0, import_react30.createElement)(
+        shown2 === "usage" ? null : (0, import_react30.createElement)(
           "div",
           { key: pageKey, className: "bt-settings-scroll bt-settings-page", "data-move": last.current.move },
           errorLine,
-          shown === "general" ? (0, import_react30.createElement)(GeneralPage, { roster, actions, run }) : null,
+          shown2 === "general" ? (0, import_react30.createElement)(GeneralPage, { roster, actions, run }) : null,
           bot ? (0, import_react30.createElement)("div", { className: "bt-settings-form" }, (0, import_react30.createElement)(BotSettingsForm, { key: bot.id, bot, roster, actions, run })) : null,
-          shown === "bots" && !bot ? (0, import_react30.createElement)(BotsPage, { roster, actions, run }) : null,
+          shown2 === "bots" && !bot ? (0, import_react30.createElement)(BotsPage, { roster, actions, run }) : null,
           room2 ? (0, import_react30.createElement)("div", { className: "bt-settings-form" }, (0, import_react30.createElement)(GroupSettingsForm, { key: room2.id, room: room2, roster, actions, run })) : null,
-          shown === "groups" && !room2 ? (0, import_react30.createElement)(GroupsPage, { roster, actions, run }) : null,
-          shown === "connectors" ? (0, import_react30.createElement)(ConnectorsPage, { roster, actions }) : null,
-          shown === "capabilities" ? (0, import_react30.createElement)(CapabilitiesPage, { roster, actions, run }) : null,
-          shown === "schedules" ? (0, import_react30.createElement)(SchedulesPage, { roster, actions, start: id ?? void 0 }) : null,
-          shown === "secrets" ? (0, import_react30.createElement)(SecretsPage, { roster, actions, run, Section: SetSection }) : null,
-          shown === "feedback" ? (0, import_react30.createElement)(FeedbackPage, { actions, run, Section: SetSection, Row: SetRow }) : null,
-          shown === "about" ? (0, import_react30.createElement)(AboutPage, { useUpdate, actions, run, Section: SetSection, Row: SetRow }) : null
+          shown2 === "groups" && !room2 ? (0, import_react30.createElement)(GroupsPage, { roster, actions, run }) : null,
+          shown2 === "connectors" ? (0, import_react30.createElement)(ConnectorsPage, { roster, actions }) : null,
+          shown2 === "capabilities" ? (0, import_react30.createElement)(CapabilitiesPage, { roster, actions, run }) : null,
+          shown2 === "schedules" ? (0, import_react30.createElement)(SchedulesPage, { roster, actions, start: id ?? void 0 }) : null,
+          shown2 === "secrets" ? (0, import_react30.createElement)(SecretsPage, { roster, actions, run, Section: SetSection }) : null,
+          shown2 === "feedback" ? (0, import_react30.createElement)(FeedbackPage, { actions, run, Section: SetSection, Row: SetRow }) : null,
+          shown2 === "about" ? (0, import_react30.createElement)(AboutPage, { useUpdate, actions, run, Section: SetSection, Row: SetRow }) : null
         ),
         usageOpened ? (0, import_react30.createElement)(
           "div",
-          { key: "usage", className: "bt-settings-scroll bt-settings-usage", "data-off": shown === "usage" ? void 0 : "", "aria-hidden": shown === "usage" ? void 0 : true },
-          shown === "usage" ? errorLine : null,
+          { key: "usage", className: "bt-settings-scroll bt-settings-usage", "data-off": shown2 === "usage" ? void 0 : "", "aria-hidden": shown2 === "usage" ? void 0 : true },
+          shown2 === "usage" ? errorLine : null,
           (0, import_react30.createElement)(UsagePage, { roster, actions, focusId: usageFocus })
         ) : null
       ),
@@ -11701,13 +11763,13 @@ function About({ text, title = "About" }) {
 var PILE_MAX = 4;
 function MemberPile({ room: room2, roster }) {
   const members = room2.members.map((id) => roster.byId[id]).filter(Boolean);
-  const shown = members.length > PILE_MAX ? members.slice(0, PILE_MAX - 1) : members;
-  const more = members.length - shown.length;
+  const shown2 = members.length > PILE_MAX ? members.slice(0, PILE_MAX - 1) : members;
+  const more = members.length - shown2.length;
   return (0, import_react33.createElement)(
     "span",
     { className: "bt-pile", "aria-hidden": true },
-    shown.map((bot, index) => (0, import_react33.createElement)("span", { key: bot.id, className: "bt-pile-face", style: { animationDelay: `${index * 40}ms` } }, (0, import_react33.createElement)(BotMark, { bot, size: 44, live: true }))),
-    more > 0 ? (0, import_react33.createElement)("span", { key: "more", className: "bt-pile-face bt-pile-more", style: { animationDelay: `${shown.length * 40}ms` } }, `+${more}`) : null
+    shown2.map((bot, index) => (0, import_react33.createElement)("span", { key: bot.id, className: "bt-pile-face", style: { animationDelay: `${index * 40}ms` } }, (0, import_react33.createElement)(BotMark, { bot, size: 44, live: true }))),
+    more > 0 ? (0, import_react33.createElement)("span", { key: "more", className: "bt-pile-face bt-pile-more", style: { animationDelay: `${shown2.length * 40}ms` } }, `+${more}`) : null
   );
 }
 var markOf = (entry) => entry?.state === "ask" ? "alert" : entry?.state === "work" ? workState(entry.doing) : "idle";
@@ -12834,9 +12896,9 @@ ${body2 || "(no text)"}
     const style = styleOf(el);
     const display = style.display;
     if (display === "none" || style.contentVisibility === "hidden") return "";
-    const shown = style.visibility === "visible";
+    const shown2 = style.visibility === "visible";
     const keepsSpace = String(style.whiteSpace || "").startsWith("pre") || style.whiteSpace === "break-spaces";
-    const next = { ...ctx, depth: ctx.depth + 1, shown };
+    const next = { ...ctx, depth: ctx.depth + 1, shown: shown2 };
     if (display === "contents" && !SEMANTIC.test(tag) && !el.matches(ITEM)) return children(el, next);
     if (style.overflowX !== "visible" || style.overflowY !== "visible") {
       const box = el.getBoundingClientRect();
@@ -12846,7 +12908,7 @@ ${body2 || "(no text)"}
     if (tag === "hr") return "\n\n---\n\n";
     if (tag === "img") {
       const alt = collapse(el.getAttribute("alt"));
-      return shown && alt ? `[image: ${alt}]` : "";
+      return shown2 && alt ? `[image: ${alt}]` : "";
     }
     if (tag === "canvas") {
       const box = el.getBoundingClientRect();
@@ -12864,7 +12926,7 @@ ${body2 || "(no text)"}
     }
     let body2;
     if (tag === "pre") {
-      const code = shown ? String(el.innerText || el.textContent || "") : "";
+      const code = shown2 ? String(el.innerText || el.textContent || "") : "";
       chars += code.length;
       body2 = code.trim() ? keep(fenced(code, langOf(el))) : "";
     } else if (tag === "table") {
@@ -13028,7 +13090,7 @@ function createBotBrowsers({ bridge, createSource: createSource2, storage = glob
   const store = sharedMap(STORE_KEY, storage);
   let saved = store.read();
   let layer;
-  let shown = null;
+  let shown2 = null;
   let rect = null;
   let visible = false;
   let resizeLater = 0;
@@ -13074,7 +13136,7 @@ function createBotBrowsers({ bridge, createSource: createSource2, storage = glob
       top: `${box.top}px`,
       width: `${box.width}px`,
       height: `${box.height}px`,
-      visibility: shown === entry.tabId && visible && rect ? "visible" : "hidden"
+      visibility: shown2 === entry.tabId && visible && rect ? "visible" : "hidden"
     });
   };
   async function preview(tabId) {
@@ -13190,7 +13252,7 @@ function createBotBrowsers({ bridge, createSource: createSource2, storage = glob
     return job;
   }
   function trim() {
-    const idle = [...views.values()].filter((entry) => entry.tabId !== shown).sort((a, b) => a.usedAt - b.usedAt);
+    const idle = [...views.values()].filter((entry) => entry.tabId !== shown2).sort((a, b) => a.usedAt - b.usedAt);
     while (views.size > MAX_LIVE && idle.length > 0) void release(idle.shift().tabId);
   }
   async function release(tabId) {
@@ -13220,7 +13282,7 @@ function createBotBrowsers({ bridge, createSource: createSource2, storage = glob
     if (state === void 0 || !state.ids.includes(tabId)) return;
     await opening.get(tabId)?.catch(() => {
     });
-    if (shown === tabId) await show(null);
+    if (shown2 === tabId) await show(null);
     await release(tabId);
     tabs.set((snapshot) => {
       const current = snapshot[botId];
@@ -13250,7 +13312,7 @@ function createBotBrowsers({ bridge, createSource: createSource2, storage = glob
   }
   const activeTab = (botId) => tabs.getSnapshot()[botId]?.active ?? null;
   async function show(tabId, box = null) {
-    if (tabId !== null && tabId === shown && visible && box !== null) {
+    if (tabId !== null && tabId === shown2 && visible && box !== null) {
       rect = box;
       const entry2 = views.get(tabId);
       if (entry2) place(entry2);
@@ -13260,13 +13322,13 @@ function createBotBrowsers({ bridge, createSource: createSource2, storage = glob
       }, RESIZE_LATER_MS);
       return;
     }
-    shown = tabId;
+    shown2 = tabId;
     if (box) rect = box;
     visible = tabId !== null && box !== null;
     for (const entry2 of views.values()) place(entry2);
     if (tabId === null) return;
     const entry = await open(tabId);
-    if (entry === void 0 || shown !== tabId) return;
+    if (entry === void 0 || shown2 !== tabId) return;
     entry.usedAt = Date.now();
     place(entry);
   }
@@ -13290,7 +13352,7 @@ function createBotBrowsers({ bridge, createSource: createSource2, storage = glob
     for (const tabId of tabs.getSnapshot()[botId]?.ids ?? []) {
       await opening.get(tabId)?.catch(() => {
       });
-      if (shown === tabId) await show(null);
+      if (shown2 === tabId) await show(null);
       await release(tabId);
       owner.delete(tabId);
       pages.set((snapshot) => {
@@ -13564,8 +13626,8 @@ function UserMessageCell({ node, sessionId, useRoster, actions, renderMessageIma
   const referenceLabels = data.referenceLabels ?? [];
   const references = openFile && openSkill ? { openFile, openSkill } : void 0;
   const steering = node.kind === "steering";
-  const { shown, folded, control } = useFold(text, { markdown: false });
-  const body = (0, import_react36.createElement)(UserText, { text: shown, bots: mentionableBots(roster, sessionId), referenceLabels, skillNames: data.skillNames ?? [], references, actions });
+  const { shown: shown2, folded, control } = useFold(text, { markdown: false });
+  const body = (0, import_react36.createElement)(UserText, { text: shown2, bots: mentionableBots(roster, sessionId), referenceLabels, skillNames: data.skillNames ?? [], references, actions });
   return (0, import_react36.createElement)(
     "div",
     { className: "bt-umsg", "data-steering": steering || void 0 },
@@ -14406,6 +14468,7 @@ function apply(ctx) {
     () => installCompiledStyles(MEMBER_CSS, "members"),
     () => installCompiledStyles(USER_MESSAGE_CSS, "user-messages"),
     () => installCompiledStyles(MOBILE_CSS, "mobile"),
+    () => installMobileBack(),
     browsers ? () => installCompiledStyles(BROWSER_CSS, "browser") : null,
     () => installTheme(),
     () => shadow("sidebar.workspaces", { priority: BOT_PRIORITY, inject: face }, TeamSidebar),
