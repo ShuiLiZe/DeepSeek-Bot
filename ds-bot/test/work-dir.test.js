@@ -111,8 +111,10 @@ async function start({ services = {}, workspaces = [], llm, team: saved = TEAM }
     await until(() => agentOf(state().bots[botId].sessionId).session.header.cwd === dir)
     await settle()
   }
-  const stop = () => {
-    ctx.dispose()
+  const stop = async () => {
+    // Unloading settles the plugin's own writes; removing the folder first leaves a
+    // write that lands nothing to rename.
+    await ctx.dispose()
     if (process.env.DSH_HOME === currentHome) {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome

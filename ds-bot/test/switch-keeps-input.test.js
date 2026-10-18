@@ -330,14 +330,17 @@ test('a marked part that stayed current is woken for its kept input, once, in or
 })
 
 test('unmarked earlier parts are never resolved by the restart pass', async (t) => {
-  const host = await start({ services })
-  await moveWriter(host, [])
-  await until(() => host.state().bots.b.sessionId === 's1')
-  assert.deepEqual(host.state().switching, {})
+  const fail = { flush: 2 }
+  const host = await start({ fail, services })
+  host.agentOf('b').inbox.nextTurn.push(said('h1', 'waiting input', 'e-held'))
+  await moveWriter(host, [said('m1', 'Now build it', 'e-carry')])
+  // The move fails while unloaded, so the part stays marked for the restart pass.
+  await until(() => host.infos.some(line => line.includes('plugin unloaded')))
+  assert.equal(host.state().bots.b.sessionId, 's1')
+  assert.deepEqual(host.state().switching, { b: { botId: 'b' } })
   await host.stop({ keep: true })
 
   const second = await start({ home: host.home, services })
   t.after(second.stop)
-  await second.rt.handBackDone()
   assert.equal(second.resolved.includes('b'), false)
 })

@@ -723,6 +723,8 @@ export function install(rt) {
     if (rt.readOnly() !== undefined) return
     for (const [sessionId, owner] of Object.entries(state.switching ?? {})) {
       if (settledSwitches.has(sessionId)) continue
+      // The switch that left the mark is still running: it is what hands its input on.
+      if (switches.has(sessionId)) continue
       try {
         const agent = await rt.resolveAgent(sessionId)
         const held = [...agent.inbox.nextStep, ...agent.inbox.nextTurn]
