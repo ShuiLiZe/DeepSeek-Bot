@@ -709,6 +709,11 @@ export function install(rt) {
     pending.forEach((message, index) => agent.send(message, inboxTargetOf(message), index === 0))
   }
 
+  // A switch this plugin finished with, by the Session it left or the one it produced.
+  // The restart pass below skips those: the input it would hand on is no longer kept
+  // there, and a long test run keeps a timer that ends a Second past its own restart.
+  const settledSwitches = new Map()
+
   // A switch that lost its move or its input to a failure leaves its part marked in
   // state.switching. Hand on what it kept: input an earlier part still holds goes to
   // the part that replaced it and the earlier part is archived as the switch meant
@@ -717,6 +722,7 @@ export function install(rt) {
     await rt.load()
     if (rt.readOnly() !== undefined) return
     for (const [sessionId, owner] of Object.entries(state.switching ?? {})) {
+      if (settledSwitches.has(sessionId)) continue
       try {
         const agent = await rt.resolveAgent(sessionId)
         const held = [...agent.inbox.nextStep, ...agent.inbox.nextTurn]
@@ -757,6 +763,8 @@ export function install(rt) {
             await rt.save()
           }
           noteFailures.delete(agent.id)
+          settledSwitches.set(agent.id, true)
+          if (rt.chatOf(job.botId) !== undefined) settledSwitches.set(rt.chatOf(job.botId), true)
           folderRetry.delete(agent.id)
           // The folder may have changed again while the switch ran.
           if (job.roomId === undefined) void followFolder(job.botId)
@@ -1112,11 +1120,26 @@ export function install(rt) {
     if (end !== undefined && end.data?.reason?.kind !== 'error') rescued.delete(agent.id)
   }
 
+  // The restart's hand-back pass, which waits a moment so the Bots are back first.
+  const HAND_BACK = 'ds-bot: hand on input kept in earlier parts'
+  let handBackTimer
+
+  function armHandBack() {
+    handBackTimer = setTimeout(() => void heldBack().catch(error => rt.warn('ds-bot: handing on input kept in earlier parts failed: %s', error)), RESUME_DELAY_MS)
+    handBackTimer.unref?.()
+  }
+
+  // Resolves once that pass has run, starting it now if it has not.
+  async function handBackDone() {
+    if (handBackTimer !== undefined) clearTimeout(handBackTimer)
+    handBackTimer = undefined
+    await heldBack()
+  }
+
   ctx.effect(() => {
-    const timer = setTimeout(() => void heldBack().catch(error => rt.warn('ds-bot: handing on input kept in earlier parts failed: %s', error)), RESUME_DELAY_MS)
-    timer.unref?.()
-    return () => clearTimeout(timer)
-  }, 'ds-bot: hand on input kept in earlier parts')
+    armHandBack()
+    return () => clearTimeout(handBackTimer)
+  }, HAND_BACK)
 
   ctx.on('agent/status', ({ agent, status }) => {
     if (status === 'idle' && rt.isBotSession(agent.id)) {
@@ -1212,5 +1235,8 @@ export function install(rt) {
     return { sessionId: parts.at(-1).sessionId, ...(await partPage(parts, index, cursor)) }
   }
 
-  Object.assign(rt, { clock, partsOf, historyEntry, partLines, noteText, earlierPage, chatPage, displayItems, followFolder, heldBack, switchJobs: () => switches.values() })
+  Object.assign(rt, {
+    clock, partsOf, historyEntry, partLines, noteText, earlierPage, chatPage, displayItems, followFolder,
+    heldBack, handBackDone, switchJobs: () => switches.values(),
+  })
 }

@@ -293,7 +293,7 @@ test('a marked earlier part hands its kept input on after a restart, once, and i
   const second = await start({ home: host.home, services })
   t.after(second.stop)
   second.agentOf('s1').inbox.nextTurn.push(said('m1-copy', 'Now build it', 'e-carry'))
-  await second.rt.heldBack()
+  await second.rt.handBackDone()
 
   const delivered = second.agentOf('s1').calls
     .filter(([kind, message]) => (kind === 'followup' || kind === 'inject') && message.source?.role !== 'handoff')
@@ -316,7 +316,7 @@ test('a marked part that stayed current is woken for its kept input, once, in or
 
   const second = await start({ home: host.home, services })
   t.after(second.stop)
-  await second.rt.heldBack()
+  await second.rt.handBackDone()
 
   // The inbox kept the input; the wake re-sends it through send() so the driver runs.
   const sends = second.agentOf('b').calls.filter(([kind]) => kind === 'send')
@@ -338,6 +338,6 @@ test('unmarked earlier parts are never resolved by the restart pass', async (t) 
 
   const second = await start({ home: host.home, services })
   t.after(second.stop)
-  await second.rt.heldBack()
+  await second.rt.handBackDone()
   assert.equal(second.resolved.includes('b'), false)
 })

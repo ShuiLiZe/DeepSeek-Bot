@@ -38,8 +38,11 @@ async function start({ services = {}, workspaces = [], llm, team: saved = TEAM }
   const project = join(root, 'project')
   for (const dir of [team, project]) mkdirSync(dir, { recursive: true })
   writeFileSync(join(home, 'state.json'), JSON.stringify(saved))
+  // The tests in this file share one process and run side by side, so each keeps to
+  // the DSH_HOME it set: one test's teardown must not point another at an empty home.
+  let currentHome
   const previousHome = process.env.DSH_HOME
-  process.env.DSH_HOME = dsh
+  process.env.DSH_HOME = currentHome = dsh
 
   const ctx = fakeContext({ services })
   const created = []
@@ -110,8 +113,10 @@ async function start({ services = {}, workspaces = [], llm, team: saved = TEAM }
   }
   const stop = () => {
     ctx.dispose()
-    if (previousHome === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = previousHome
+    if (process.env.DSH_HOME === currentHome) {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+    }
     rmSync(root, { recursive: true, force: true, maxRetries: 5 })
   }
   // Loading once fills the Session-owner indexes.
